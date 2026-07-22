@@ -1,0 +1,29 @@
+# Local application data. Never commit student records or backup copies.
+data/
+backups/
+
+# Python runtime artifacts.
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.coverage
+*.egg-info/
+
+# Package output created in the later EXE packaging stage.
+build/
+dist-python/
+dist-python-updated/
+dist-python-workbench/
+
+# Local database sidecars and runtime logs.
+*.db-journal
+*.db-shm
+*.db-wal
+*.log
+
+# Web prototype dependencies and generated build output.
+ui-prototype/node_modules/
+ui-prototype/dist/
+ui-prototype/package-lock.json
