@@ -1,31 +1,38 @@
 # Design QA
 
-## Reference and viewport
+## Reference and viewports
 
-- Selected reference: `C:\Users\zhengheisey\.codex\generated_images\019f6135-56b0-7be0-aaea-61b57946bbc7\exec-537675ad-54a4-4997-a61e-dc3944055abf.png`
-- Reference viewport: `1487 x 1058`
-- Prototype screenshot: `docs/visual-qa-workbench.png`
-- Independent timetable screenshot: `docs/visual-qa-teaching-schedule.png`
-- Calendar screenshot: `docs/visual-qa-planner.png`
-- Backup center screenshot: `docs/visual-qa-backup.png`
-- Side-by-side comparison: `docs/visual-qa-comparison.png` (reference on the left, application on the right)
+- Selected visual direction: `ui-prototype/artifacts/prototype-dashboard-final.png`
+- Wide desktop viewport: `1487 x 1058`
+- Minimum supported viewport: `1120 x 700`
+- Workbench: `docs/visual-qa-workbench.png`
+- Compact workbench: `docs/visual-qa-workbench-compact.png`
+- Student center: `docs/visual-qa-students.png`
+- Compact student center: `docs/visual-qa-students-compact.png`
+- Timetable: `docs/visual-qa-teaching-schedule.png`
+- Calendar: `docs/visual-qa-planner.png`
+- Backup center: `docs/visual-qa-backup.png`
 
 ## Checked
 
-- Default landing state is the daily class workbench; the student-center toolbar is hidden until its own navigation item is selected.
-- The left navigation, pale gray work area, white data surfaces, thin separators, jade primary action, and restrained class-color accents follow the selected office-workbench direction.
-- Workbench controls navigate to the timetable, open the calendar-entry dialog, and open the existing attendance and moral-evaluation modules.
-- Class colors are persisted in SQLite and appear in timetable cells, class badges, calendar markings, and event rows.
-- Courses, class events, global events, daily course lists, and daily statistics render with seeded local data.
-- The independent timetable renders five teacher-defined periods, start/end times, seven weekdays, three differently colored teaching groups, and the all-groups summary state without requiring a student class for the evening-study group.
-- The backup center keeps destructive restore secondary to clear manual and scheduled backup actions, with a configurable local destination and readable backup history in the same desktop-workbench style.
-- The workbench and calendar both retain draggable splitters and user-resizable table columns.
+- The formal PySide6 application now uses the approved solid-blue navigation, white application header, pale gray workspace, and restrained blue primary actions.
+- Brand, page title, page subtitle, current date, navigation state, and page-local actions have clear visual hierarchy.
+- Navigation and frequent actions use a consistent native icon treatment with tooltips where the label is hidden.
+- The student toolbar appears only on the student page and remains usable at the minimum window width.
+- Workbench class/date controls move into the common header without changing their data behavior.
+- Five metric cards use real SQLite counts for students, courses, attendance, events, and moral records.
+- Course and event lists preserve real schedule details and avoid inventing unsupported task-completion state.
+- Recent class activity combines real attendance and moral records, while QtCharts renders the latest seven days.
+- Existing business pages render inside the new shell without clipping or overlapping.
+- Workbench columns and rows remain draggable; existing resizable table columns and class semantic colors remain intact.
+- Wide and compact screenshots show stable panel dimensions and no incoherent overlap.
 
 ## Notes
 
-- The offscreen Qt renderer used for automated screenshots does not load the local Chinese UI font, so Chinese glyphs appear as boxes in the generated QA images. The application stylesheet explicitly requests `Microsoft YaHei UI`, which is available on the target Windows desktop environment.
-- The reference shows a product concept with attendance and parent-contact queues. The implemented workbench keeps the same daily-work structure while presenting the modules and local records that currently exist in this application.
+- The offscreen Qt renderer does not load the local Chinese UI font, so Chinese glyphs appear as boxes in automated screenshots. The application requests `Microsoft YaHei UI`, which is available on the target Windows environment.
+- The event model has no completion field, so the dashboard presents calendar items as real schedules instead of simulated checkable tasks.
+- Arbitrary card drag, reorder, and resize remain intentionally deferred; the stable splitter layout is retained.
 
 ## Final result
 
-Passed. The visible startup-state mismatch found during the first capture was fixed, then the workbench and calendar were captured again at the reference viewport for final comparison.
+Passed. The common PySide6 shell and formal workbench are ready for the score-analysis redesign.

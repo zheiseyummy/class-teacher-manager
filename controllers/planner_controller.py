@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import re
-from datetime import date, datetime, time
+from collections import Counter
+from datetime import date, datetime, time, timedelta
 from typing import Any
 
 from sqlalchemy import func, or_, select
@@ -287,6 +288,8 @@ class PlannerController:
                 "class": self._class_dict(class_group, student_count),
                 "courses": courses,
                 "events": [self._event_dict(event) for event in events],
+                "activity_trend": self._activity_trend(session, class_id, target_date),
+                "recent_activity": self._recent_activity(session, class_id, target_date),
                 "metrics": {
                     "student_count": student_count,
                     "course_count": len(courses),
@@ -294,6 +297,134 @@ class PlannerController:
                     "moral_count": moral_count,
                 },
             }
+
+    def _activity_trend(self, session, class_id: int, target_date: date) -> list[dict[str, Any]]:
+        """Return seven days of real attendance and moral-record counts."""
+
+        start_date = target_date - timedelta(days=6)
+        period_start = datetime.combine(start_date, time.min)
+        period_end = datetime.combine(target_date, time.max)
+        attendance_records = session.scalars(
+            select(LeaveRecord)
+            .join(Student, LeaveRecord.student_id == Student.id)
+            .where(
+                LeaveRecord.is_deleted.is_(False),
+                Student.is_deleted.is_(False),
+                Student.class_id == class_id,
+                LeaveRecord.start_time <= period_end,
+                LeaveRecord.end_time >= period_start,
+            )
+        ).all()
+        moral_counts = Counter(
+            session.scalars(
+                select(MoralRecord.record_date)
+                .join(Student, MoralRecord.student_id == Student.id)
+                .where(
+                    MoralRecord.is_deleted.is_(False),
+                    Student.is_deleted.is_(False),
+                    Student.class_id == class_id,
+                    MoralRecord.record_date >= start_date,
+                    MoralRecord.record_date <= target_date,
+                )
+            ).all()
+        )
+
+        result: list[dict[str, Any]] = []
+        for offset in range(7):
+            current_date = start_date + timedelta(days=offset)
+            day_start = datetime.combine(current_date, time.min)
+            day_end = datetime.combine(current_date, time.max)
+            attendance_count = sum(
+                bool(
+                    record.start_time
+                    and record.end_time
+                    and record.start_time <= day_end
+                    and record.end_time >= day_start
+                )
+                for record in attendance_records
+            )
+            result.append(
+                {
+                    "date": current_date,
+                    "label": f"{current_date.month}/{current_date.day}",
+                    "attendance": attendance_count,
+                    "moral": int(moral_counts[current_date]),
+                }
+            )
+        return result
+
+    def _recent_activity(self, session, class_id: int, target_date: date) -> list[dict[str, Any]]:
+        """Combine recent attendance and moral records for the dashboard feed."""
+
+        target_end = datetime.combine(target_date, time.max)
+        attendance_records = session.scalars(
+            select(LeaveRecord)
+            .options(joinedload(LeaveRecord.student))
+            .join(Student, LeaveRecord.student_id == Student.id)
+            .where(
+                LeaveRecord.is_deleted.is_(False),
+                Student.is_deleted.is_(False),
+                Student.class_id == class_id,
+                LeaveRecord.start_time <= target_end,
+            )
+            .order_by(LeaveRecord.start_time.desc(), LeaveRecord.id.desc())
+            .limit(8)
+        ).all()
+        moral_records = session.scalars(
+            select(MoralRecord)
+            .options(joinedload(MoralRecord.student))
+            .join(Student, MoralRecord.student_id == Student.id)
+            .where(
+                MoralRecord.is_deleted.is_(False),
+                Student.is_deleted.is_(False),
+                Student.class_id == class_id,
+                MoralRecord.record_date <= target_date,
+            )
+            .order_by(MoralRecord.record_date.desc(), MoralRecord.id.desc())
+            .limit(8)
+        ).all()
+
+        activities: list[dict[str, Any]] = []
+        for record in attendance_records:
+            record_type = record.leave_type or "其他"
+            detail = record.reason or record.approval_status or "已登记"
+            activities.append(
+                {
+                    "_sort_at": record.start_time or datetime.min,
+                    "kind": "考勤",
+                    "tone": self._attendance_tone(record_type),
+                    "title": f"{record.student.name} · {record_type}",
+                    "detail": detail,
+                    "time_display": record.start_time.strftime("%m-%d %H:%M") if record.start_time else "",
+                }
+            )
+        for record in moral_records:
+            point_note = f" · {record.points:+g} 分" if record.points else ""
+            activities.append(
+                {
+                    "_sort_at": datetime.combine(record.record_date, time.min),
+                    "kind": "德育",
+                    "tone": "success",
+                    "title": f"{record.student.name} · {record.category}",
+                    "detail": f"{record.title}{point_note}",
+                    "time_display": record.record_date.strftime("%m-%d"),
+                }
+            )
+        activities.sort(key=lambda item: item["_sort_at"], reverse=True)
+        result = activities[:6]
+        for item in result:
+            item.pop("_sort_at", None)
+        return result
+
+    @staticmethod
+    def _attendance_tone(record_type: str) -> str:
+        if record_type == "缺勤":
+            return "danger"
+        if record_type in {"迟到", "早退"}:
+            return "warning"
+        if record_type in {"病假", "事假"}:
+            return "info"
+        return "neutral"
 
     def _course_values(self, data: dict[str, Any]) -> dict[str, Any]:
         class_id = self._int_value(data.get("class_id"), "班级")

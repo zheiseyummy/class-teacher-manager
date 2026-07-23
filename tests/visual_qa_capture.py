@@ -167,6 +167,20 @@ def run() -> None:
             app.processEvents()
             assert window.grab().save(str(output_dir / "visual-qa-workbench.png"))
 
+            window.resize(1120, 700)
+            app.processEvents()
+            assert window.grab().save(str(output_dir / "visual-qa-workbench-compact.png"))
+
+            window.resize(1487, 1058)
+            window.menu.setCurrentRow(1)
+            app.processEvents()
+            assert window.grab().save(str(output_dir / "visual-qa-students.png"))
+
+            window.resize(1120, 700)
+            app.processEvents()
+            assert window.grab().save(str(output_dir / "visual-qa-students-compact.png"))
+
+            window.resize(1487, 1058)
             window.menu.setCurrentRow(6)
             window.planner_view.show_course_tab()
             app.processEvents()
