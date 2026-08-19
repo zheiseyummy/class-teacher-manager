@@ -1,22 +1,28 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from PySide6.QtCore import QSize, Qt
 from PySide6.QtGui import QColor, QIcon, QPainter, QPixmap
-from PySide6.QtWidgets import QStyle, QWidget
+
+ICON_DIR = Path(__file__).resolve().parents[1] / "resources" / "icons"
 
 
-def tinted_standard_icon(
-    source: QWidget,
-    standard_pixmap: QStyle.StandardPixmap,
+def lucide_icon(
+    name: str,
     *,
     color: str = "#53657A",
     active_color: str = "#2563EB",
     selected_color: str | None = None,
     size: int = 18,
 ) -> QIcon:
-    """Return a palette-friendly icon based on Qt's native icon set."""
+    """Return a consistently rendered, palette-friendly Lucide icon."""
 
-    source_icon = source.style().standardIcon(standard_pixmap)
+    icon_path = ICON_DIR / f"{name}.svg"
+    if not icon_path.exists():
+        return QIcon()
+
+    source_icon = QIcon(str(icon_path))
     icon = QIcon()
     target_size = QSize(size, size)
     icon.addPixmap(

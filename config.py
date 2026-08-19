@@ -6,6 +6,8 @@ from pathlib import Path
 
 
 APP_NAME = "班主任综合管理系统"
+APP_VERSION = "0.9.0"
+APP_VERSION_LABEL = f"v{APP_VERSION}"
 PROJECT_ROOT = Path(__file__).resolve().parent
 RESOURCE_DIR = PROJECT_ROOT / "resources"
 TEMPLATE_DIR = RESOURCE_DIR / "templates"

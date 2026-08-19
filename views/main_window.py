@@ -4,11 +4,12 @@ import sys
 from datetime import date
 from pathlib import Path
 
-from PySide6.QtCore import QProcess, QSize, Qt, QUrl
+from PySide6.QtCore import QProcess, QSize, Qt, QUrl, Signal
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
     QApplication,
     QComboBox,
+    QDialog,
     QFileDialog,
     QFrame,
     QHBoxLayout,
@@ -22,16 +23,16 @@ from PySide6.QtWidgets import (
     QPushButton,
     QSplitter,
     QStackedWidget,
-    QStyle,
     QVBoxLayout,
     QWidget,
 )
 
-from config import APP_NAME, RESOURCE_DIR, STUDENT_IMPORT_TEMPLATE
+from config import APP_NAME, APP_VERSION_LABEL, RESOURCE_DIR, STUDENT_IMPORT_TEMPLATE
 from controllers.student_controller import StudentDataError
+from controllers.teacher_profile_controller import TeacherProfileController
 from utils.backup_scheduler import BackupScheduler
 from utils.excel_service import ensure_student_import_template
-from utils.ui_icons import tinted_standard_icon
+from utils.ui_icons import lucide_icon
 from utils.ui_layout import restore_splitter
 from views.attendance_view import AttendanceView
 from views.backup_view import BackupView
@@ -41,7 +42,47 @@ from views.planner_view import CourseCalendarView
 from views.quality_view import QualityView
 from views.scores_view import ScoresView
 from views.students_view import StudentsView
+from views.teacher_profile_dialog import TeacherProfileDialog
 from views.workbench_view import TodayWorkbenchView
+
+
+class ClickableLabel(QLabel):
+    clicked = Signal()
+
+    def __init__(self, text: str = "", parent: QWidget | None = None) -> None:
+        super().__init__(text, parent)
+        self._clickable = True
+        self.set_clickable(True)
+
+    def set_clickable(self, enabled: bool) -> None:
+        self._clickable = enabled
+        self.setProperty("clickable", enabled)
+        self.setCursor(
+            Qt.CursorShape.PointingHandCursor if enabled else Qt.CursorShape.ArrowCursor
+        )
+        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus if enabled else Qt.FocusPolicy.NoFocus)
+        self.style().unpolish(self)
+        self.style().polish(self)
+
+    def mouseReleaseEvent(self, event) -> None:
+        if (
+            self._clickable
+            and event.button() == Qt.MouseButton.LeftButton
+            and self.rect().contains(event.position().toPoint())
+        ):
+            self.clicked.emit()
+        super().mouseReleaseEvent(event)
+
+    def keyPressEvent(self, event) -> None:
+        if self._clickable and event.key() in (
+            Qt.Key.Key_Return,
+            Qt.Key.Key_Enter,
+            Qt.Key.Key_Space,
+        ):
+            self.clicked.emit()
+            event.accept()
+            return
+        super().keyPressEvent(event)
 
 
 class MainWindow(QMainWindow):
@@ -68,6 +109,8 @@ class MainWindow(QMainWindow):
         self.stack = QStackedWidget()
         self.search_input = QLineEdit()
         self.class_filter = QComboBox()
+        self.teacher_profile_controller = TeacherProfileController()
+        self.teacher_profile = self.teacher_profile_controller.get_profile()
 
         self._build_ui()
         self._apply_style()
@@ -104,9 +147,8 @@ class MainWindow(QMainWindow):
         brand_mark.setObjectName("brandMark")
         brand_mark.setAlignment(Qt.AlignmentFlag.AlignCenter)
         brand_mark.setFixedSize(40, 40)
-        brand_icon = tinted_standard_icon(
-            self,
-            QStyle.StandardPixmap.SP_DesktopIcon,
+        brand_icon = lucide_icon(
+            "graduation-cap",
             color="#FFFFFF",
             active_color="#FFFFFF",
             size=22,
@@ -129,19 +171,18 @@ class MainWindow(QMainWindow):
         self.menu.setSpacing(2)
         self.menu.setIconSize(QSize(18, 18))
         navigation_items = (
-            ("今日班级工作台", QStyle.StandardPixmap.SP_DesktopIcon),
-            ("学生数据中心", QStyle.StandardPixmap.SP_FileDialogListView),
-            ("综合素质评价", QStyle.StandardPixmap.SP_DialogApplyButton),
-            ("成绩管理", QStyle.StandardPixmap.SP_FileDialogDetailedView),
-            ("德育评价", QStyle.StandardPixmap.SP_DialogYesButton),
-            ("请假与考勤", QStyle.StandardPixmap.SP_FileDialogInfoView),
-            ("课程表与日历", QStyle.StandardPixmap.SP_FileDialogContentsView),
-            ("数据备份与恢复", QStyle.StandardPixmap.SP_DriveHDIcon),
+            ("今日班级工作台", "layout-dashboard"),
+            ("学生数据中心", "users-round"),
+            ("综合素质评价", "shield-check"),
+            ("成绩管理", "chart-no-axes-column-increasing"),
+            ("德育评价", "award"),
+            ("请假与考勤", "calendar-clock"),
+            ("课程表与日历", "calendar-days"),
+            ("数据备份与恢复", "database-backup"),
         )
         for text, icon_name in navigation_items:
             item = QListWidgetItem(
-                tinted_standard_icon(
-                    self,
+                lucide_icon(
                     icon_name,
                     color="#C7DCFF",
                     active_color="#FFFFFF",
@@ -154,9 +195,21 @@ class MainWindow(QMainWindow):
         self.menu.setCurrentRow(0)
         sidebar_layout.addWidget(self.menu, 1)
 
-        sidebar_footer = QLabel("本地办公版  ·  8 个模块")
+        sidebar_footer = QFrame()
         sidebar_footer.setObjectName("sidebarFooter")
-        sidebar_footer.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        sidebar_footer_layout = QVBoxLayout(sidebar_footer)
+        sidebar_footer_layout.setContentsMargins(8, 8, 8, 8)
+        sidebar_footer_layout.setSpacing(2)
+        self.sidebar_version = QLabel(f"本地办公版  ·  {APP_VERSION_LABEL}")
+        self.sidebar_version.setObjectName("sidebarVersion")
+        self.sidebar_version.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        sidebar_footer_layout.addWidget(self.sidebar_version)
+        self.sidebar_personal_mark = ClickableLabel()
+        self.sidebar_personal_mark.setObjectName("sidebarPersonalMark")
+        self.sidebar_personal_mark.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.sidebar_personal_mark.setWordWrap(True)
+        self.sidebar_personal_mark.setToolTip("编辑教师信息")
+        sidebar_footer_layout.addWidget(self.sidebar_personal_mark)
         sidebar_layout.addWidget(sidebar_footer)
 
         content = QFrame()
@@ -174,7 +227,7 @@ class MainWindow(QMainWindow):
         shell_header_layout.setSpacing(18)
         title_layout = QVBoxLayout()
         title_layout.setSpacing(2)
-        self.page_title = QLabel()
+        self.page_title = ClickableLabel()
         self.page_title.setObjectName("pageTitle")
         title_layout.addWidget(self.page_title)
         self.page_subtitle = QLabel()
@@ -210,16 +263,12 @@ class MainWindow(QMainWindow):
 
         self.manage_class_button = QPushButton("管理班级")
         self.manage_class_button.setObjectName("secondaryButton")
-        self.manage_class_button.setIcon(
-            tinted_standard_icon(self, QStyle.StandardPixmap.SP_DirOpenIcon)
-        )
+        self.manage_class_button.setIcon(lucide_icon("users-round"))
         top_layout.addWidget(self.manage_class_button)
 
         self.import_button = QPushButton("导入 Excel")
         self.import_button.setObjectName("secondaryButton")
-        self.import_button.setIcon(
-            tinted_standard_icon(self, QStyle.StandardPixmap.SP_DialogOpenButton)
-        )
+        self.import_button.setIcon(lucide_icon("file-up"))
         import_menu = QMenu(self)
         import_menu.addAction("选择 Excel 文件", self._import_excel)
         import_menu.addAction("打开导入模板", self._open_import_template)
@@ -228,9 +277,7 @@ class MainWindow(QMainWindow):
 
         self.export_button = QPushButton("导出 Excel")
         self.export_button.setObjectName("secondaryButton")
-        self.export_button.setIcon(
-            tinted_standard_icon(self, QStyle.StandardPixmap.SP_DialogSaveButton)
-        )
+        self.export_button.setIcon(lucide_icon("file-down"))
         export_menu = QMenu(self)
         export_menu.addAction("导出全部学生信息", self._export_all_students)
         export_menu.addAction("导出当前班级学生信息", self._export_current_class)
@@ -241,9 +288,8 @@ class MainWindow(QMainWindow):
         self.add_student_button = QPushButton("新增学生")
         self.add_student_button.setObjectName("primaryButton")
         self.add_student_button.setIcon(
-            tinted_standard_icon(
-                self,
-                QStyle.StandardPixmap.SP_FileDialogNewFolder,
+            lucide_icon(
+                "user-plus",
                 color="#FFFFFF",
                 active_color="#FFFFFF",
             )
@@ -275,6 +321,7 @@ class MainWindow(QMainWindow):
         restore_splitter(self.root_splitter, "main_window", [224, 1136])
         root_layout.addWidget(self.root_splitter)
         self.setCentralWidget(root)
+        self._refresh_teacher_profile()
 
     def _connect_signals(self) -> None:
         self.menu.currentRowChanged.connect(self._change_page)
@@ -288,6 +335,8 @@ class MainWindow(QMainWindow):
         self.workbench_view.navigate_requested.connect(self.menu.setCurrentRow)
         self.workbench_view.planner_action_requested.connect(self._open_planner_from_workbench)
         self.backup_view.restart_requested.connect(self._restart_application)
+        self.page_title.clicked.connect(self._open_teacher_profile_from_header)
+        self.sidebar_personal_mark.clicked.connect(self._open_teacher_profile)
 
     def _change_page(self, index: int) -> None:
         if not 0 <= index < len(self.PAGE_META):
@@ -296,8 +345,11 @@ class MainWindow(QMainWindow):
         self.top_bar.setVisible(index == 1)
         title, subtitle = self.PAGE_META[index]
         if index == 0:
+            title = self.teacher_profile["greeting"]
             subtitle = f"今天是 {self._format_date(date.today())}"
         self.page_title.setText(title)
+        self.page_title.set_clickable(index == 0)
+        self.page_title.setToolTip("编辑教师信息" if index == 0 else "")
         self.page_subtitle.setText(subtitle)
         self.workbench_view.header_controls.setVisible(index == 0)
         self.header_date.setVisible(index != 0)
@@ -311,6 +363,30 @@ class MainWindow(QMainWindow):
             self.planner_view.refresh_all()
         elif index == 7:
             self.backup_view.refresh_all()
+
+    def show_teacher_setup_if_needed(self) -> None:
+        profile = self.teacher_profile_controller.get_profile()
+        if profile["onboarding_completed"]:
+            return
+        dialog = TeacherProfileDialog(self.teacher_profile_controller, self, onboarding=True)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            self.teacher_profile_controller.dismiss_onboarding()
+        self._refresh_teacher_profile()
+
+    def _open_teacher_profile_from_header(self) -> None:
+        if self.menu.currentRow() == 0:
+            self._open_teacher_profile()
+
+    def _open_teacher_profile(self) -> None:
+        dialog = TeacherProfileDialog(self.teacher_profile_controller, self)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            self._refresh_teacher_profile()
+
+    def _refresh_teacher_profile(self) -> None:
+        self.teacher_profile = self.teacher_profile_controller.get_profile()
+        self.sidebar_personal_mark.setText(self.teacher_profile["personal_mark_display"])
+        if self.menu.currentRow() == 0:
+            self.page_title.setText(self.teacher_profile["greeting"])
 
     def _refresh_planning_classes(self) -> None:
         self.workbench_view.refresh_classes()

@@ -14,6 +14,7 @@ from models.quality import (
 from models.reserved import ClassCadre, LeaveRecord
 from models.schedule import CalendarEvent, CourseSchedule
 from models.student import Student
+from models.teacher_profile import TeacherProfile
 from models.teaching_schedule import AcademicSemester, SchedulePeriod, TeachingCourse, TeachingGroup
 
 __all__ = [
@@ -38,6 +39,7 @@ __all__ = [
     "LeaveRecord",
     "SchedulePeriod",
     "Student",
+    "TeacherProfile",
     "TeachingCourse",
     "TeachingGroup",
 ]

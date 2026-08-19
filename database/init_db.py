@@ -14,6 +14,7 @@ from models import quality  # noqa: F401
 from models import reserved  # noqa: F401
 from models import schedule  # noqa: F401
 from models import student  # noqa: F401
+from models import teacher_profile  # noqa: F401
 from models import teaching_schedule  # noqa: F401
 
 

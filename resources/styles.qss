@@ -29,12 +29,24 @@ QMainWindow {
 }
 
 #sidebarFooter {
-    color: #cfe1ff;
     background: rgba(10, 55, 132, 0.22);
     border: 1px solid rgba(255, 255, 255, 0.11);
     border-radius: 7px;
-    padding: 10px 8px;
+}
+
+#sidebarVersion {
+    color: #dbe9ff;
     font-size: 11px;
+    font-weight: 600;
+}
+
+#sidebarPersonalMark {
+    color: #b8d2f7;
+    font-size: 10px;
+}
+
+#sidebarPersonalMark[clickable="true"]:hover {
+    color: #ffffff;
 }
 
 #menu {
@@ -80,6 +92,55 @@ QMainWindow {
     color: #172033;
     font-size: 22px;
     font-weight: 700;
+}
+
+#pageTitle[clickable="true"]:hover {
+    color: #1d5fd0;
+}
+
+#profileDialogIcon {
+    background: #eaf2ff;
+    border: 1px solid #cfe0ff;
+    border-radius: 8px;
+}
+
+#dialogTitle {
+    color: #172033;
+    font-size: 18px;
+    font-weight: 700;
+}
+
+#dialogHint, #privacyHint {
+    color: #7a8799;
+    font-size: 11px;
+}
+
+#sectionTitle {
+    color: #28364a;
+    font-size: 13px;
+    font-weight: 700;
+}
+
+#profileClassList {
+    color: #344054;
+    background: #f9fafc;
+    border: 1px solid #dfe5ed;
+    border-radius: 7px;
+    padding: 4px;
+}
+
+#profileClassList::item {
+    min-height: 28px;
+    padding: 0 6px;
+}
+
+#profilePreview {
+    color: #315175;
+    background: #f1f6fd;
+    border: 1px solid #d8e6f7;
+    border-radius: 7px;
+    padding: 9px 11px;
+    font-size: 11px;
 }
 
 #pageSubtitle {
@@ -329,6 +390,19 @@ QTabBar::tab:selected {
     border: none;
 }
 
+#workbenchDateDisplay {
+    min-height: 35px;
+    max-height: 35px;
+    background: #ffffff;
+    border: 1px solid #d8e0ea;
+    border-radius: 7px;
+}
+
+#workbenchDateLabel {
+    color: #405067;
+    font-size: 12px;
+}
+
 #metricCard {
     background: #ffffff;
     border: 1px solid #e1e7ef;
@@ -413,7 +487,7 @@ QPushButton#dashboardActionButton:hover {
     border-color: #bfd0ec;
 }
 
-#trendSummary {
+#scoreFluctuationSummary {
     color: #16865f;
     background: #e8f6f0;
     border: 1px solid #d1ebdf;
@@ -449,6 +523,45 @@ QListWidget#dashboardList::item:last {
     color: #253247;
     font-size: 12px;
     font-weight: 600;
+}
+
+#scoreStudentName, #scoreCompare {
+    color: #253247;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+#subjectChange {
+    color: #7c899b;
+    font-size: 9px;
+}
+
+QLabel#rankChangeBadge {
+    color: #657287;
+    background: #f1f4f8;
+    border: 1px solid #e4e9ef;
+    border-radius: 5px;
+    padding: 2px 5px;
+    font-size: 9px;
+    font-weight: 600;
+}
+
+QLabel#rankChangeBadge[tone="up"] {
+    color: #16865f;
+    background: #e6f5ef;
+    border-color: #cfe9df;
+}
+
+QLabel#rankChangeBadge[tone="down"] {
+    color: #c84753;
+    background: #fde9eb;
+    border-color: #f4cfd4;
+}
+
+QLabel#rankChangeBadge[tone="steady"] {
+    color: #657287;
+    background: #f1f4f8;
+    border-color: #e4e9ef;
 }
 
 #rowSecondary, #rowMeta {

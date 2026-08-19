@@ -14,7 +14,7 @@ from typing import Any
 
 from sqlalchemy import and_, func, or_, select
 
-from config import APP_NAME, BACKUP_DIR, DATABASE_PATH, ensure_app_dirs
+from config import APP_NAME, APP_VERSION, BACKUP_DIR, DATABASE_PATH, ensure_app_dirs
 from database.connection import engine, get_session
 from database.init_db import initialize_database
 from models.backup_record import BackupRecord, BackupSettings
@@ -275,6 +275,7 @@ class BackupController:
             manifest: dict[str, Any] = {
                 "format_version": self.FORMAT_VERSION,
                 "app_name": APP_NAME,
+                "app_version": APP_VERSION,
                 "backup_kind": kind,
                 "created_at": datetime.now().isoformat(timespec="seconds"),
                 "database": database_metadata,

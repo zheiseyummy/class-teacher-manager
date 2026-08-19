@@ -307,6 +307,110 @@ class ScoreController:
                 previous_averages[stat["subject"]] = stat["average"]
         return trends
 
+    def get_recent_fluctuations(self, class_id: int, limit: int = 5) -> dict[str, Any]:
+        """Compare the latest two same-semester exams available for one class."""
+
+        current: dict[str, Any] | None = None
+        previous: dict[str, Any] | None = None
+        for exam in self.list_exams():
+            snapshot = self._exam_snapshot(exam["id"])
+            states = {
+                student_id: state
+                for student_id, state in snapshot["states"].items()
+                if state["class_id"] == class_id
+            }
+            if not states:
+                continue
+            candidate = {"exam": snapshot["exam"], "states": states}
+            if current is None:
+                current = candidate
+            elif self._same_comparison_period(current["exam"], candidate["exam"]):
+                previous = candidate
+                break
+
+        if current is None:
+            return {
+                "current_exam": None,
+                "previous_exam": None,
+                "rows": [],
+                "reason": "该班暂无考试成绩",
+            }
+
+        current_exam = current["exam"]
+        if previous is None:
+            return {
+                "current_exam": current_exam,
+                "previous_exam": None,
+                "rows": [],
+                "reason": "本学期至少需要两次该班考试成绩",
+            }
+
+        rows: list[dict[str, Any]] = []
+        common_student_ids = set(current["states"]) & set(previous["states"])
+        for student_id in common_student_ids:
+            current_state = current["states"][student_id]
+            previous_state = previous["states"][student_id]
+            current_subjects = set(current_state["scores"])
+            previous_subjects = set(previous_state["scores"])
+            subject_changes = [
+                {
+                    "subject": subject,
+                    "previous": previous_state["scores"][subject],
+                    "current": current_state["scores"][subject],
+                    "change": self._round(
+                        current_state["scores"][subject] - previous_state["scores"][subject]
+                    ),
+                }
+                for subject in current_subjects & previous_subjects
+            ]
+            subject_changes.sort(key=lambda row: (-abs(row["change"]), row["subject"]))
+            total_change = self._round(current_state["total"] - previous_state["total"])
+            rank_change = previous_state["class_rank"] - current_state["class_rank"]
+            if (
+                rank_change == 0
+                and total_change == 0
+                and not any(item["change"] for item in subject_changes)
+            ):
+                continue
+            rows.append(
+                {
+                    "student_id": student_id,
+                    "name": current_state["name"],
+                    "student_no": current_state["student_no"],
+                    "previous_total": previous_state["total"],
+                    "current_total": current_state["total"],
+                    "total_change": total_change,
+                    "total_comparable": current_subjects == previous_subjects,
+                    "previous_class_rank": previous_state["class_rank"],
+                    "current_class_rank": current_state["class_rank"],
+                    "previous_grade_rank": previous_state["grade_rank"],
+                    "current_grade_rank": current_state["grade_rank"],
+                    "rank_change": rank_change,
+                    "subject_changes": subject_changes[:2],
+                }
+            )
+
+        rows.sort(
+            key=lambda row: (
+                -abs(row["rank_change"]),
+                -(
+                    abs(row["total_change"])
+                    if row["total_comparable"]
+                    else max(
+                        (abs(item["change"]) for item in row["subject_changes"]),
+                        default=0,
+                    )
+                ),
+                row["name"],
+            )
+        )
+        return {
+            "current_exam": current_exam,
+            "previous_exam": previous["exam"],
+            "rows": rows[: max(1, limit)],
+            "reason": "" if rows else "最近两次考试暂无成绩波动",
+        }
+
     def _exam_snapshot(self, exam_id: int) -> dict[str, Any]:
         with get_session() as session:
             exam = session.scalar(
@@ -363,12 +467,21 @@ class ScoreController:
                     "id": exam.id,
                     "label": self._exam_label(exam),
                     "name": exam.name,
+                    "exam_date": exam.exam_date,
                     "semester": exam.semester or "",
                     "grade": exam.grade or "",
                 },
                 "subjects": subjects,
                 "states": states,
             }
+
+    @staticmethod
+    def _same_comparison_period(current: dict[str, Any], previous: dict[str, Any]) -> bool:
+        if current["semester"] and current["semester"] != previous["semester"]:
+            return False
+        if current["grade"] and previous["grade"] and current["grade"] != previous["grade"]:
+            return False
+        return True
 
     def _find_or_create_exam(self, session, values: dict[str, Any]) -> Exam:
         stmt = select(Exam).where(Exam.name == values["name"], Exam.is_deleted.is_(False))

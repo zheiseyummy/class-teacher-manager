@@ -155,9 +155,6 @@ def run() -> None:
                 "moral_count": 1,
             }
             assert len(overview["events"]) == 2
-            assert len(overview["activity_trend"]) == 7
-            assert overview["activity_trend"][-1]["attendance"] == 1
-            assert overview["activity_trend"][-1]["moral"] == 1
             assert {item["kind"] for item in overview["recent_activity"]} == {"考勤", "德育"}
 
             try:

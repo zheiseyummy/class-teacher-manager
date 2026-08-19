@@ -12,27 +12,35 @@
 - Timetable: `docs/visual-qa-teaching-schedule.png`
 - Calendar: `docs/visual-qa-planner.png`
 - Backup center: `docs/visual-qa-backup.png`
+- Teacher profile: `docs/visual-qa-teacher-profile.png`
+- Compact teacher profile: `docs/visual-qa-teacher-profile-compact.png`
+- Teacher greeting and sidebar footer: `docs/visual-qa-teacher-footer.png`
 
 ## Checked
 
 - The formal PySide6 application now uses the approved solid-blue navigation, white application header, pale gray workspace, and restrained blue primary actions.
 - Brand, page title, page subtitle, current date, navigation state, and page-local actions have clear visual hierarchy.
-- Navigation and frequent actions use a consistent native icon treatment with tooltips where the label is hidden.
+- Navigation and frequent actions use bundled Lucide SVG icons, so their shape no longer depends on the active Windows or Qt theme.
 - The student toolbar appears only on the student page and remains usable at the minimum window width.
-- Workbench class/date controls move into the common header without changing their data behavior.
+- The workbench class selector remains interactive, while the current date is now a read-only display and cannot open a calendar or accept edits.
 - Five metric cards use real SQLite counts for students, courses, attendance, events, and moral records.
 - Course and event lists preserve real schedule details and avoid inventing unsupported task-completion state.
-- Recent class activity combines real attendance and moral records, while QtCharts renders the latest seven days.
+- Recent class activity combines real attendance and moral records.
+- The lower-right panel compares the latest two same-semester exams for the selected class and shows student totals, class-rank changes, and the two largest common-subject changes.
+- When two exams contain different subjects, the total row explicitly says that the subjects differ instead of presenting the raw total difference as directly comparable.
 - Existing business pages render inside the new shell without clipping or overlapping.
 - Workbench columns and rows remain draggable; existing resizable table columns and class semantic colors remain intact.
-- Wide and compact screenshots show stable panel dimensions and no incoherent overlap.
+- Dashboard list rows now recalculate their width after window resizing, preserving course states, event categories, and score-change badges.
+- Wide and compact screenshots show stable panel dimensions, normal icons, complete labels, and no incoherent overlap.
+- The teacher profile dialog remains complete at both regular and minimum sizes; subjects, classes, semester, personal mark preview, privacy hint, and actions do not overlap.
+- The workbench greeting uses the stored teacher name, while the compact sidebar footer keeps `v0.9.0` and the personal mark visible without reducing navigation space.
 
 ## Notes
 
-- The offscreen Qt renderer does not load the local Chinese UI font, so Chinese glyphs appear as boxes in automated screenshots. The application requests `Microsoft YaHei UI`, which is available on the target Windows environment.
+- Final screenshots were captured with the native Windows Qt renderer; Chinese text and bundled SVG icons both render normally.
 - The event model has no completion field, so the dashboard presents calendar items as real schedules instead of simulated checkable tasks.
 - Arbitrary card drag, reorder, and resize remain intentionally deferred; the stable splitter layout is retained.
 
 ## Final result
 
-Passed. The common PySide6 shell and formal workbench are ready for the score-analysis redesign.
+Passed. The workbench corrections and the `v0.9.0` teacher personalization step are complete. The unified semester and student enrollment-history work can continue.

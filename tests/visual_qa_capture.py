@@ -19,12 +19,13 @@ def run() -> None:
         config.DATABASE_URL = f"sqlite:///{config.DATABASE_PATH.as_posix()}"
 
         from PySide6.QtCore import QDate
-        from PySide6.QtWidgets import QApplication
+        from PySide6.QtWidgets import QApplication, QLabel
 
         from controllers.attendance_controller import AttendanceController
         from controllers.backup_controller import BackupController
         from controllers.moral_controller import MoralController
         from controllers.planner_controller import PlannerController
+        from controllers.score_controller import ScoreController
         from controllers.student_controller import StudentController
         from controllers.teaching_schedule_controller import TeachingScheduleController
         from database.connection import engine
@@ -43,7 +44,9 @@ def run() -> None:
             student_a = students.create_student(
                 {"class_id": class_a, "name": "李明", "student_no": "202601"}, []
             )
-            students.create_student({"class_id": class_a, "name": "王婷", "student_no": "202602"}, [])
+            students.create_student(
+                {"class_id": class_a, "name": "王婷", "student_no": "202602"}, []
+            )
             students.create_student({"class_id": class_b, "name": "张宇", "student_no": "202603"}, [])
             students.create_student({"class_id": class_c, "name": "陈雨", "student_no": "202604"}, [])
 
@@ -155,20 +158,65 @@ def run() -> None:
                     "points": 2,
                 }
             )
+            first_score_path = root / "六月月考.xlsx"
+            _write_score_book(
+                first_score_path,
+                [
+                    ["李明", "202601", "初三1班", 90, 88, 85],
+                    ["王婷", "202602", "初三1班", 95, 93, 92],
+                ],
+            )
+            second_score_path = root / "七月阶段检测.xlsx"
+            _write_score_book(
+                second_score_path,
+                [
+                    ["李明", "202601", "初三1班", 98, 96, 91],
+                    ["王婷", "202602", "初三1班", 94, 92, 90],
+                ],
+            )
+            score_controller = ScoreController()
+            score_controller.import_scores_from_excel(
+                first_score_path,
+                {
+                    "name": "六月月考",
+                    "exam_date": date(2026, 6, 20),
+                    "semester": "初三下",
+                    "grade": "初三",
+                },
+            )
+            score_controller.import_scores_from_excel(
+                second_score_path,
+                {
+                    "name": "七月阶段检测",
+                    "exam_date": date(2026, 7, 15),
+                    "semester": "初三下",
+                    "grade": "初三",
+                },
+            )
             BackupController().create_full_backup()
 
             app = QApplication([])
             window = MainWindow()
             window.resize(1487, 1058)
             workbench_date = QDate(target_date.year, target_date.month, target_date.day)
-            window.workbench_view.date_edit.setDate(workbench_date)
+            window.workbench_view.set_reference_date(target_date)
             window.menu.setCurrentRow(0)
+            window.page_subtitle.setText(f"今天是 {window._format_date(target_date)}")
             window.show()
             app.processEvents()
+            assert window.workbench_view.date_label.text() == "2026-07-16"
+            assert not hasattr(window.workbench_view, "date_edit")
+            assert window.workbench_view.score_fluctuation_list.count() == 2
+            assert all(not window.menu.item(index).icon().isNull() for index in range(window.menu.count()))
             assert window.grab().save(str(output_dir / "visual-qa-workbench.png"))
 
             window.resize(1120, 700)
             app.processEvents()
+            for index in range(window.workbench_view.score_fluctuation_list.count()):
+                row = window.workbench_view.score_fluctuation_list.itemWidget(
+                    window.workbench_view.score_fluctuation_list.item(index)
+                )
+                assert row.findChild(QLabel, "rankChangeBadge").isVisible()
             assert window.grab().save(str(output_dir / "visual-qa-workbench-compact.png"))
 
             window.resize(1487, 1058)
@@ -198,6 +246,18 @@ def run() -> None:
             app.quit()
         finally:
             engine.dispose()
+
+
+def _write_score_book(file_path: Path, rows: list[list[object]]) -> None:
+    from openpyxl import Workbook
+
+    workbook = Workbook()
+    worksheet = workbook.active
+    worksheet.append(["姓名", "学号", "班级", "语文", "数学", "英语"])
+    for row in rows:
+        worksheet.append(row)
+    workbook.save(file_path)
+    workbook.close()
 
 
 if __name__ == "__main__":

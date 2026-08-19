@@ -90,6 +90,21 @@ def run() -> None:
             subject_trends = controller.get_subject_trends(class_a)
             chinese_second = [row for row in subject_trends if row["subject"] == "语文"][-1]
             assert chinese_second["change"] == 1.5
+            fluctuations = controller.get_recent_fluctuations(class_a)
+            assert fluctuations["current_exam"]["name"] == "期中考试"
+            assert fluctuations["previous_exam"]["name"] == "第一次月考"
+            fluctuation_rows = {row["name"]: row for row in fluctuations["rows"]}
+            assert fluctuation_rows["甲"]["previous_total"] == 385
+            assert fluctuation_rows["甲"]["current_total"] == 406
+            assert fluctuation_rows["甲"]["rank_change"] == 1
+            assert fluctuation_rows["甲"]["total_comparable"] is False
+            assert fluctuation_rows["甲"]["subject_changes"][0] == {
+                "subject": "英语",
+                "previous": 95.0,
+                "current": 102.0,
+                "change": 7.0,
+            }
+            assert fluctuation_rows["乙"]["rank_change"] == -1
 
             standalone_path = root / "独立成绩.xlsx"
             _write_scores(standalone_path, ["姓名", "语文", "数学"], [["独立学生", 100, 100]])

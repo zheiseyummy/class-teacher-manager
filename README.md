@@ -11,12 +11,15 @@
 - 德育评价：集体活动、获奖荣誉、志愿服务、班级服务等记录，支持手动积分、学生累计统计和 Excel 导出。
 - 课程表与日历：独立教学班、学期和自定义课时管理；教学班可选关联学生班级，支持按颜色汇总查看；可记录班级日程和全局提醒，并在日历中按颜色标记。
 - 数据备份与恢复：完整 SQLite 快照 ZIP、带学期信息的归档包、每天或每周定时备份、恢复前安全备份和一键恢复。
-- 今日班级工作台：启动后集中显示当天课程、日程、考勤和德育记录，并提供课程、日程、考勤、德育的快捷入口。
+- 今日班级工作台：启动后集中显示当天课程、日程、考勤、德育记录，以及同学期最近两次考试的学生进退步和相关成绩；顶部日期为只读的系统当天日期。
 - 现代桌面工作台：侧栏、主面板和成绩详情可拖动调整大小；表格列可调宽、移动并会记住分栏尺寸。
+- 教师个性化：首次使用可填写教师姓名、学校、任教学科、常用班级和默认学期；首页问候与侧栏个人标记会同步更新。当前开发版本为 `v0.9.0`。
 
 ## 启动
 
 已安装项目依赖后，双击 [启动班主任管理系统.bat](启动班主任管理系统.bat) 即可运行当前版本。
+
+首次启动会显示教师信息设置窗口。可以先跳过，之后点击首页问候语或侧栏底部个人标记再次填写。
 
 首次在新电脑部署时，在项目目录执行：
 
@@ -61,6 +64,7 @@ dist-python/ClassTeacherManager/ClassTeacherManager.exe
 .venv\Scripts\python.exe tests\teaching_schedule_ui_smoke_test.py
 .venv\Scripts\python.exe tests\backup_smoke_test.py
 .venv\Scripts\python.exe tests\backup_ui_smoke_test.py
+.venv\Scripts\python.exe tests\teacher_profile_smoke_test.py
 ```
 
 ## 项目结构

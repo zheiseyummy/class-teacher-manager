@@ -3,29 +3,27 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import Any
 
-from PySide6.QtCharts import QBarCategoryAxis, QChart, QChartView, QLineSeries, QValueAxis
-from PySide6.QtCore import QDate, QMargins, QSize, Qt, Signal
-from PySide6.QtGui import QColor, QFont, QPainter, QPen
+from PySide6.QtCore import QSize, Qt, Signal
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QComboBox,
-    QDateEdit,
     QFrame,
     QGridLayout,
     QHBoxLayout,
     QLabel,
+    QListView,
     QListWidget,
     QListWidgetItem,
     QPushButton,
     QSizePolicy,
     QSplitter,
-    QStyle,
     QVBoxLayout,
     QWidget,
 )
 
 from controllers.planner_controller import PlannerController, PlannerDataError
-from utils.ui_icons import tinted_standard_icon
+from controllers.score_controller import ScoreController, ScoreDataError
+from utils.ui_icons import lucide_icon
 from utils.ui_layout import restore_splitter
 
 
@@ -35,7 +33,7 @@ class MetricCard(QFrame):
     def __init__(
         self,
         label: str,
-        standard_pixmap: QStyle.StandardPixmap,
+        icon_name: str,
         tone: str,
         icon_color: str,
         parent: QWidget | None = None,
@@ -56,9 +54,8 @@ class MetricCard(QFrame):
         icon_label.setProperty("tone", tone)
         icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         icon_label.setFixedSize(42, 42)
-        icon = tinted_standard_icon(
-            self,
-            standard_pixmap,
+        icon = lucide_icon(
+            icon_name,
             color=icon_color,
             active_color=icon_color,
             size=20,
@@ -85,87 +82,8 @@ class MetricCard(QFrame):
         self.setToolTip(f"{self.value_label.text()} · {note}")
 
 
-class ActivityTrendChart(QChartView):
-    """Seven-day line chart using the QtCharts module bundled with PySide6."""
-
-    def __init__(self, parent: QWidget | None = None) -> None:
-        super().__init__(parent)
-        self.setObjectName("activityTrendChart")
-        self.setRenderHint(QPainter.RenderHint.Antialiasing)
-        self.setMinimumHeight(150)
-        self.setStyleSheet("background: transparent; border: none;")
-        self.set_data([])
-
-    def set_data(self, rows: list[dict[str, Any]]) -> None:
-        chart = QChart()
-        chart.setBackgroundVisible(False)
-        chart.setPlotAreaBackgroundVisible(False)
-        chart.setMargins(QMargins(2, 2, 2, 0))
-        chart.layout().setContentsMargins(0, 0, 0, 0)
-
-        attendance_series = QLineSeries()
-        attendance_series.setName("考勤记录")
-        attendance_series.setColor(QColor("#7C4DCC"))
-        attendance_series.setPen(QPen(QColor("#7C4DCC"), 2))
-        attendance_series.setPointsVisible(True)
-        attendance_series.setMarkerSize(6)
-
-        moral_series = QLineSeries()
-        moral_series.setName("德育记录")
-        moral_series.setColor(QColor("#16966A"))
-        moral_series.setPen(QPen(QColor("#16966A"), 2))
-        moral_series.setPointsVisible(True)
-        moral_series.setMarkerSize(6)
-
-        labels: list[str] = []
-        maximum = 0
-        for index, row in enumerate(rows):
-            attendance = int(row.get("attendance", 0))
-            moral = int(row.get("moral", 0))
-            labels.append(str(row.get("label", "")))
-            attendance_series.append(index, attendance)
-            moral_series.append(index, moral)
-            maximum = max(maximum, attendance, moral)
-
-        if not labels:
-            labels = ["暂无数据"]
-            attendance_series.append(0, 0)
-            moral_series.append(0, 0)
-
-        chart.addSeries(attendance_series)
-        chart.addSeries(moral_series)
-
-        axis_x = QBarCategoryAxis()
-        axis_x.append(labels)
-        axis_x.setGridLineVisible(False)
-        axis_x.setLabelsColor(QColor("#738196"))
-        axis_x.setLabelsFont(QFont("Microsoft YaHei UI", 8))
-
-        axis_y = QValueAxis()
-        axis_y.setRange(0, max(1, maximum + 1))
-        axis_y.setTickCount(min(5, max(2, maximum + 2)))
-        axis_y.setLabelFormat("%d")
-        axis_y.setLabelsColor(QColor("#738196"))
-        axis_y.setLabelsFont(QFont("Microsoft YaHei UI", 8))
-        axis_y.setGridLinePen(QPen(QColor("#E8EDF4"), 1))
-
-        chart.addAxis(axis_x, Qt.AlignmentFlag.AlignBottom)
-        chart.addAxis(axis_y, Qt.AlignmentFlag.AlignLeft)
-        attendance_series.attachAxis(axis_x)
-        attendance_series.attachAxis(axis_y)
-        moral_series.attachAxis(axis_x)
-        moral_series.attachAxis(axis_y)
-
-        legend = chart.legend()
-        legend.setVisible(True)
-        legend.setAlignment(Qt.AlignmentFlag.AlignBottom)
-        legend.setLabelColor(QColor("#5F6D80"))
-        legend.setFont(QFont("Microsoft YaHei UI", 8))
-        self.setChart(chart)
-
-
 class TodayWorkbenchView(QWidget):
-    """Daily class desk with real metrics, lists, and a seven-day trend."""
+    """Daily class desk with real metrics, activities, and recent score changes."""
 
     navigate_requested = Signal(int)
     planner_action_requested = Signal(str)
@@ -173,6 +91,8 @@ class TodayWorkbenchView(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.controller = PlannerController()
+        self.score_controller = ScoreController()
+        self._reference_date: date | None = None
         self._classes: list[dict[str, Any]] = []
         self._build_header_controls()
         self._build_ui()
@@ -190,21 +110,34 @@ class TodayWorkbenchView(QWidget):
         self.class_box.currentIndexChanged.connect(self.refresh)
         header_layout.addWidget(self.class_box)
 
-        self.date_edit = QDateEdit(QDate.currentDate())
-        self.date_edit.setCalendarPopup(True)
-        self.date_edit.setDisplayFormat("yyyy-MM-dd")
-        self.date_edit.setMinimumWidth(142)
-        self.date_edit.dateChanged.connect(self.refresh)
-        header_layout.addWidget(self.date_edit)
+        self.date_display = QFrame()
+        self.date_display.setObjectName("workbenchDateDisplay")
+        self.date_display.setMinimumWidth(142)
+        date_layout = QHBoxLayout(self.date_display)
+        date_layout.setContentsMargins(11, 0, 11, 0)
+        date_layout.setSpacing(7)
+        date_icon = QLabel()
+        date_icon.setPixmap(
+            lucide_icon(
+                "calendar-days",
+                color="#718096",
+                active_color="#718096",
+                size=16,
+            ).pixmap(QSize(16, 16))
+        )
+        date_icon.setFixedSize(16, 16)
+        date_layout.addWidget(date_icon)
+        self.date_label = QLabel()
+        self.date_label.setObjectName("workbenchDateLabel")
+        date_layout.addWidget(self.date_label, 1)
+        header_layout.addWidget(self.date_display)
 
         self.refresh_button = QPushButton()
         self.refresh_button.setObjectName("iconButton")
         self.refresh_button.setToolTip("刷新工作台")
         self.refresh_button.setAccessibleName("刷新工作台")
         self.refresh_button.setFixedWidth(38)
-        self.refresh_button.setIcon(
-            tinted_standard_icon(self, QStyle.StandardPixmap.SP_BrowserReload)
-        )
+        self.refresh_button.setIcon(lucide_icon("refresh-cw"))
         self.refresh_button.clicked.connect(self.refresh)
         header_layout.addWidget(self.refresh_button)
 
@@ -222,35 +155,35 @@ class TodayWorkbenchView(QWidget):
             (
                 "student_count",
                 "在班学生",
-                QStyle.StandardPixmap.SP_FileDialogListView,
+                "users-round",
                 "blue",
                 "#2563EB",
             ),
             (
                 "course_count",
                 "今日课程",
-                QStyle.StandardPixmap.SP_FileDialogDetailedView,
+                "book-open-check",
                 "green",
                 "#16966A",
             ),
             (
                 "attendance_count",
                 "考勤记录",
-                QStyle.StandardPixmap.SP_DialogApplyButton,
+                "user-check",
                 "purple",
                 "#7C4DCC",
             ),
             (
                 "event_count",
                 "今日日程",
-                QStyle.StandardPixmap.SP_FileDialogInfoView,
+                "clipboard-check",
                 "orange",
                 "#D88913",
             ),
             (
                 "moral_count",
                 "德育记录",
-                QStyle.StandardPixmap.SP_DialogYesButton,
+                "award",
                 "red",
                 "#DB515D",
             ),
@@ -277,10 +210,10 @@ class TodayWorkbenchView(QWidget):
         self.right_splitter = QSplitter(Qt.Orientation.Vertical)
         self.right_splitter.setChildrenCollapsible(False)
         self.right_splitter.addWidget(self._build_event_panel())
-        self.right_splitter.addWidget(self._build_trend_panel())
+        self.right_splitter.addWidget(self._build_score_fluctuation_panel())
         self.right_splitter.setStretchFactor(0, 1)
         self.right_splitter.setStretchFactor(1, 1)
-        restore_splitter(self.right_splitter, "workbench_right_v2", [340, 300])
+        restore_splitter(self.right_splitter, "workbench_right_v3", [340, 300])
 
         self.body_splitter.addWidget(self.left_splitter)
         self.body_splitter.addWidget(self.right_splitter)
@@ -296,7 +229,7 @@ class TodayWorkbenchView(QWidget):
         header.addWidget(self.course_summary)
         schedule_button = self._action_button(
             "查看课表",
-            QStyle.StandardPixmap.SP_ArrowForward,
+            "arrow-right",
             lambda: self.planner_action_requested.emit("schedule"),
         )
         header.addWidget(schedule_button)
@@ -311,7 +244,7 @@ class TodayWorkbenchView(QWidget):
         header.addWidget(self.event_summary)
         event_button = self._action_button(
             "新建日程",
-            QStyle.StandardPixmap.SP_FileDialogNewFolder,
+            "calendar-plus",
             lambda: self.planner_action_requested.emit("calendar_new"),
         )
         header.addWidget(event_button)
@@ -323,13 +256,13 @@ class TodayWorkbenchView(QWidget):
         panel, layout, header = self._panel("近期班级动态")
         attendance_button = self._action_button(
             "考勤",
-            QStyle.StandardPixmap.SP_DialogApplyButton,
+            "calendar-clock",
             lambda: self.navigate_requested.emit(5),
         )
         header.addWidget(attendance_button)
         moral_button = self._action_button(
             "德育",
-            QStyle.StandardPixmap.SP_DialogYesButton,
+            "award",
             lambda: self.navigate_requested.emit(4),
         )
         header.addWidget(moral_button)
@@ -337,13 +270,19 @@ class TodayWorkbenchView(QWidget):
         layout.addWidget(self.activity_list, 1)
         return panel
 
-    def _build_trend_panel(self) -> QWidget:
-        panel, layout, header = self._panel("近 7 日记录趋势")
-        self.trend_summary = QLabel("考勤与德育")
-        self.trend_summary.setObjectName("trendSummary")
-        header.addWidget(self.trend_summary)
-        self.trend_chart = ActivityTrendChart()
-        layout.addWidget(self.trend_chart, 1)
+    def _build_score_fluctuation_panel(self) -> QWidget:
+        panel, layout, header = self._panel("近期考试波动学生")
+        self.score_fluctuation_summary = QLabel("暂无可比考试")
+        self.score_fluctuation_summary.setObjectName("scoreFluctuationSummary")
+        header.addWidget(self.score_fluctuation_summary)
+        score_button = self._action_button(
+            "成绩分析",
+            "chart-no-axes-column-increasing",
+            lambda: self.navigate_requested.emit(3),
+        )
+        header.addWidget(score_button)
+        self.score_fluctuation_list = self._dashboard_list()
+        layout.addWidget(self.score_fluctuation_list, 1)
         return panel
 
     @staticmethod
@@ -365,12 +304,12 @@ class TodayWorkbenchView(QWidget):
     def _action_button(
         self,
         text: str,
-        standard_pixmap: QStyle.StandardPixmap,
+        icon_name: str,
         action,
     ) -> QPushButton:
         button = QPushButton(text)
         button.setObjectName("dashboardActionButton")
-        button.setIcon(tinted_standard_icon(self, standard_pixmap, size=15))
+        button.setIcon(lucide_icon(icon_name, size=15))
         button.clicked.connect(action)
         return button
 
@@ -382,6 +321,7 @@ class TodayWorkbenchView(QWidget):
         widget.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
         widget.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         widget.setVerticalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
+        widget.setResizeMode(QListView.ResizeMode.Adjust)
         widget.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         widget.setSpacing(0)
         return widget
@@ -400,7 +340,8 @@ class TodayWorkbenchView(QWidget):
 
     def refresh(self, *_args) -> None:
         class_group = self._selected_class()
-        selected_date = self.date_edit.date().toPython()
+        selected_date = self._reference_date or date.today()
+        self.date_label.setText(selected_date.strftime("%Y-%m-%d"))
         if class_group is None:
             self._set_empty_state()
             return
@@ -410,6 +351,12 @@ class TodayWorkbenchView(QWidget):
             self.refresh_classes()
             return
         self._apply_overview(overview, selected_date)
+
+    def set_reference_date(self, value: date | None) -> None:
+        """Set a deterministic display date for testing; production always uses today."""
+
+        self._reference_date = value
+        self.refresh()
 
     def _apply_overview(self, overview: dict[str, Any], selected_date: date) -> None:
         class_group = overview["class"]
@@ -441,14 +388,19 @@ class TodayWorkbenchView(QWidget):
 
         self.course_summary.setText(f"{metrics['course_count']} 节")
         self.event_summary.setText(f"{event_count} 项")
-        total_trend_records = sum(
-            int(item["attendance"]) + int(item["moral"]) for item in overview["activity_trend"]
-        )
-        self.trend_summary.setText(f"共 {total_trend_records} 条")
         self._fill_course_list(overview["courses"], class_group, selected_date)
         self._fill_event_list(overview["events"])
         self._fill_activity_list(overview["recent_activity"])
-        self.trend_chart.set_data(overview["activity_trend"])
+        try:
+            fluctuation = self.score_controller.get_recent_fluctuations(class_group["id"], limit=5)
+        except ScoreDataError as exc:
+            fluctuation = {
+                "current_exam": None,
+                "previous_exam": None,
+                "rows": [],
+                "reason": str(exc),
+            }
+        self._fill_score_fluctuation_list(fluctuation)
 
     def _fill_course_list(
         self,
@@ -613,6 +565,140 @@ class TodayWorkbenchView(QWidget):
             row.setToolTip(f"{activity['title']} · {activity['detail']}")
             self.activity_list.setItemWidget(item, row)
 
+    def _fill_score_fluctuation_list(self, result: dict[str, Any]) -> None:
+        self.score_fluctuation_list.clear()
+        rows = result.get("rows", [])
+        current_exam = result.get("current_exam")
+        previous_exam = result.get("previous_exam")
+        if not rows:
+            self.score_fluctuation_summary.setText("暂无可比考试")
+            self.score_fluctuation_summary.setToolTip("")
+            self._add_empty_item(
+                self.score_fluctuation_list,
+                result.get("reason") or "至少导入两次同学期考试后显示",
+            )
+            return
+
+        self.score_fluctuation_summary.setText(
+            f"{self._compact_exam_name(previous_exam)} → "
+            f"{self._compact_exam_name(current_exam)}"
+        )
+        self.score_fluctuation_summary.setToolTip(
+            f"{previous_exam['label']} → {current_exam['label']}"
+        )
+        for score_row in rows:
+            item = QListWidgetItem()
+            item.setSizeHint(QSize(0, 70))
+            self.score_fluctuation_list.addItem(item)
+
+            row = QFrame()
+            row.setObjectName("dashboardRow")
+            row_layout = QHBoxLayout(row)
+            row_layout.setContentsMargins(4, 4, 4, 4)
+            row_layout.setSpacing(10)
+
+            student_widget = QWidget()
+            student_widget.setFixedWidth(78)
+            student_layout = QVBoxLayout(student_widget)
+            student_layout.setContentsMargins(0, 0, 0, 0)
+            student_layout.setSpacing(2)
+            name = QLabel(score_row["name"])
+            name.setObjectName("scoreStudentName")
+            student_layout.addWidget(name)
+            student_number = QLabel(score_row["student_no"] or "未填学号")
+            student_number.setObjectName("rowMeta")
+            student_layout.addWidget(student_number)
+            row_layout.addWidget(student_widget)
+
+            score_widget = QWidget()
+            score_widget.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
+            score_layout = QVBoxLayout(score_widget)
+            score_layout.setContentsMargins(0, 0, 0, 0)
+            score_layout.setSpacing(2)
+            rank_change = int(score_row["rank_change"])
+            if rank_change > 0:
+                badge_text, tone = f"进步 {rank_change} 名", "up"
+            elif rank_change < 0:
+                badge_text, tone = f"退步 {abs(rank_change)} 名", "down"
+            else:
+                badge_text, tone = "名次持平", "steady"
+
+            top_line = QHBoxLayout()
+            top_line.setContentsMargins(0, 0, 0, 0)
+            top_line.setSpacing(8)
+            total_change = (
+                self._signed_score(score_row["total_change"])
+                if score_row["total_comparable"]
+                else "科目不同"
+            )
+            total_label = QLabel(
+                "总分 "
+                f"{self._format_score(score_row['previous_total'])} → "
+                f"{self._format_score(score_row['current_total'])}"
+                f"（{total_change}）"
+            )
+            total_label.setObjectName("scoreCompare")
+            total_label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
+            top_line.addWidget(total_label, 1)
+            badge = QLabel(badge_text)
+            badge.setObjectName("rankChangeBadge")
+            badge.setProperty("tone", tone)
+            badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            badge.setFixedSize(80, 23)
+            top_line.addWidget(badge)
+            score_layout.addLayout(top_line)
+
+            bottom_line = QHBoxLayout()
+            bottom_line.setContentsMargins(0, 0, 0, 0)
+            bottom_line.setSpacing(8)
+            subject_label = QLabel(self._subject_change_text(score_row["subject_changes"]))
+            subject_label.setObjectName("subjectChange")
+            subject_label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
+            bottom_line.addWidget(subject_label, 1)
+            rank_label = QLabel(
+                f"班级 {score_row['previous_class_rank']} → {score_row['current_class_rank']}"
+            )
+            rank_label.setObjectName("rowMeta")
+            rank_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            rank_label.setFixedWidth(80)
+            bottom_line.addWidget(rank_label)
+            score_layout.addLayout(bottom_line)
+            row_layout.addWidget(score_widget, 1)
+
+            row.setToolTip(
+                f"{score_row['name']} · {previous_exam['label']} → {current_exam['label']} · "
+                f"总分 {self._format_score(score_row['previous_total'])} → "
+                f"{self._format_score(score_row['current_total'])} · "
+                f"{self._subject_change_text(score_row['subject_changes'])}"
+            )
+            self.score_fluctuation_list.setItemWidget(item, row)
+
+    @staticmethod
+    def _compact_exam_name(exam: dict[str, Any]) -> str:
+        name = str(exam.get("name") or exam.get("label") or "考试")
+        return name if len(name) <= 6 else f"{name[:5]}…"
+
+    @classmethod
+    def _subject_change_text(cls, rows: list[dict[str, Any]]) -> str:
+        if not rows:
+            return "暂无相同科目可比较"
+        return "；".join(
+            f"{item['subject']} {cls._format_score(item['previous'])}→"
+            f"{cls._format_score(item['current'])}（{cls._signed_score(item['change'])}）"
+            for item in rows
+        )
+
+    @staticmethod
+    def _format_score(value: float) -> str:
+        number = float(value)
+        return str(int(number)) if number.is_integer() else f"{number:.1f}"
+
+    @classmethod
+    def _signed_score(cls, value: float) -> str:
+        number = float(value)
+        prefix = "+" if number > 0 else ""
+        return f"{prefix}{cls._format_score(number)}"
+
     @staticmethod
     def _add_empty_item(widget: QListWidget, text: str) -> None:
         item = QListWidgetItem()
@@ -635,11 +721,15 @@ class TodayWorkbenchView(QWidget):
             card.set_value("--", notes[key])
         self.course_summary.setText("0 节")
         self.event_summary.setText("0 项")
-        self.trend_summary.setText("暂无记录")
+        self.score_fluctuation_summary.setText("暂无可比考试")
+        self.score_fluctuation_summary.setToolTip("")
         self._add_empty_after_clear(self.course_list, "请先在学生数据中心建立班级")
         self._add_empty_after_clear(self.event_list, "建立班级后可维护日程")
         self._add_empty_after_clear(self.activity_list, "暂无班级动态")
-        self.trend_chart.set_data([])
+        self._add_empty_after_clear(
+            self.score_fluctuation_list,
+            "建立班级并导入至少两次同学期考试后显示",
+        )
 
     @classmethod
     def _add_empty_after_clear(cls, widget: QListWidget, text: str) -> None:
