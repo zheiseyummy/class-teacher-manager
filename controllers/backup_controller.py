@@ -20,7 +20,7 @@ from database.init_db import initialize_database
 from models.backup_record import BackupRecord, BackupSettings
 from models.exam import Exam
 from models.moral import MoralRecord
-from models.reserved import LeaveRecord
+from models.attendance import LeaveRecord
 from models.schedule import CalendarEvent
 from models.teaching_schedule import AcademicSemester, SchedulePeriod, TeachingCourse
 

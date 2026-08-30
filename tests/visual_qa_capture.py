@@ -38,10 +38,9 @@ def run() -> None:
         from views.teacher_profile_dialog import TeacherProfileDialog
 
         target_date = date(2026, 7, 16)
-        output_dir = Path(__file__).resolve().parents[1] / "docs"
-        output_dir.mkdir(exist_ok=True)
-        design_output_dir = Path(__file__).resolve().parents[1] / ".design" / "screenshots"
-        design_output_dir.mkdir(parents=True, exist_ok=True)
+        output_dir = Path(__file__).resolve().parents[1] / "build" / "visual-qa"
+        output_dir.mkdir(parents=True, exist_ok=True)
+        design_output_dir = output_dir
         try:
             initialize_database()
             students = StudentController()

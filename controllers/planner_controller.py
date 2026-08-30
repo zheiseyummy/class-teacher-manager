@@ -10,7 +10,7 @@ from sqlalchemy.orm import joinedload
 from database.connection import get_session
 from models.class_group import ClassGroup
 from models.moral import MoralRecord
-from models.reserved import LeaveRecord
+from models.attendance import LeaveRecord
 from models.schedule import CalendarEvent, CourseSchedule
 from models.student import Student
 from models.teaching_schedule import AcademicSemester, SchedulePeriod, TeachingCourse, TeachingGroup

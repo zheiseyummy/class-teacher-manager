@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- 清理早期网页原型、阶段性截图、一次性 UI 审计报告和历史构建余留。
+- 重写完整 README，统一安装、数据、Excel、测试、打包和后续开发说明。
+- 将正式考勤使用的 `LeaveRecord` 独立到 `models/attendance.py`，移除未使用且已经取消的预留模型。
+- 将视觉 QA 输出统一迁移到被 Git 忽略的 `build/visual-qa/`。
+
 ## v1.0.1 - 2026-08-30
 
 正式版兼容性修复。

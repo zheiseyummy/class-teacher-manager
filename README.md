@@ -1,91 +1,425 @@
 # 班主任综合管理系统
 
-面向初中班主任个人使用的 Windows 本地桌面软件。程序基于 Python、PySide6、SQLAlchemy 和 SQLite，无需联网，学生与考试数据保存在本机。
+一款面向初中班主任和任课教师的 Windows 本地桌面管理软件。系统围绕班级与学生建立统一数据中心，用一个 SQLite 数据库集中管理学生档案、成绩、综合素质、考勤、德育、课程表、日历和备份，减少多个 Excel 文件之间的重复维护。
 
-## 当前功能
+- 当前正式版本：`v1.0.1`（第四版兼容性修复）
+- 运行方式：Windows 本地运行，无需联网
+- 技术栈：Python 3.14、PySide6、SQLAlchemy、SQLite、openpyxl
+- GitHub：[zheiseyummy/class-teacher-manager](https://github.com/zheiseyummy/class-teacher-manager)
 
-- 学生数据中心：班级、学生档案、多个家长联系人、搜索筛选、Excel 导入与导出。
-- 综合素质评价：六学期五维度 A/B/C/N/A 评价、按九下名单独立排名、比例分档、教师复核锁定及完整 Excel 档案。
-- 成绩管理：按实际参加科目导入成绩、班级/年级排名、学生与班级趋势、学科趋势、偏科分析。
-- 请假与考勤：病假、事假、迟到、早退、缺勤登记，支持按班级、类型、日期与关键词查询，并可导出 Excel。
-- 德育评价：集体活动、获奖荣誉、志愿服务、班级服务等记录，支持手动积分、学生累计统计和 Excel 导出。
-- 课程表与日历：独立教学班、学期和自定义课时管理；教学班可选关联学生班级，支持按颜色汇总查看；可记录班级日程和全局提醒，并在日历中按颜色标记。
-- 数据备份与恢复：完整 SQLite 快照 ZIP、带学期信息的归档包、每天或每周定时备份、恢复前安全备份和一键恢复。
-- 今日班级工作台：启动后集中显示当天课程、日程、考勤、德育记录，以及同学期最近两次考试的学生进退步和相关成绩；顶部日期为只读的系统当天日期。
-- 现代桌面工作台：侧栏、主面板和成绩详情可拖动调整大小；表格列可调宽、移动并会记住分栏尺寸。
-- 教师个性化：首次使用可填写教师姓名、学校、任教学科、常用班级和默认学期；首页问候与侧栏个人标记会同步更新。当前正式版本为 `v1.0.1`。
+## 1. 产品特点
 
-## 启动
+- **本地优先**：业务数据只写入当前电脑，不依赖服务器或网络账号。
+- **统一学生档案**：学生、班级、家长联系人、成绩和评价使用同一身份数据。
+- **Excel 友好**：学生、成绩和综合素质均支持批量导入，主要业务数据支持 Excel 导出。
+- **多班级管理**：既能按学生行政班管理，也能建立独立教学班课程表。
+- **持续分析**：保存多次考试，支持学生、班级、年级和学科趋势比较。
+- **教师复核优先**：删除、恢复、最终等级锁定和导出等重要操作保留人工确认。
+- **模块化结构**：界面、业务控制器、数据库模型和工具相互分离，便于继续扩展。
+- **便携发布**：可打包为不需要 Python 环境的 Windows EXE 便携包。
 
-已安装项目依赖后，双击 [启动班主任管理系统.bat](启动班主任管理系统.bat) 即可运行当前版本。
+## 2. 已完成功能
 
-首次启动会显示教师信息设置窗口。可以先跳过，之后点击首页问候语或侧栏底部个人标记再次填写。
+| 模块 | 当前能力 |
+| --- | --- |
+| 今日班级工作台 | 汇总在班人数、当日课程、考勤、日程、德育记录，以及近期考试波动学生 |
+| 学生数据中心 | 多班级、学生档案、多个家长联系人、搜索筛选、Excel 导入与导出 |
+| 综合素质评价 | 六学期、五维度、A/B/C/N/A、Excel 批量导入、累计排名、教师复核、锁定与总表导出 |
+| 成绩管理 | 九学科动态导入、考试留存、班级/年级排名、学生趋势、班级趋势、学科趋势和偏科提示 |
+| 请假与考勤 | 病假、事假、迟到、早退、缺勤等记录，筛选统计与 Excel 导出 |
+| 德育评价 | 集体活动、获奖荣誉、志愿服务、班级服务、社会实践、手动积分与 Excel 导出 |
+| 课程表与日历 | 独立教学班、学期日期、自定义课时、多班颜色、课程汇总、班级和全局日程 |
+| 数据备份与恢复 | 完整 ZIP 备份、学期归档、每天/每周定时备份、校验、恢复前安全备份与一键恢复 |
+| 教师信息 | 教师姓名、学校、任教学科、常用班级、默认学期和个人标记 |
 
-首次在新电脑部署时，在项目目录执行：
+界面采用办公型后台工作台布局：左侧模块导航、顶部上下文与操作区、右侧业务内容区。主要分栏和表格列可以拖动调整，窗口缩小时会隐藏低优先级信息并保留主要操作。
+
+## 3. 直接使用 EXE
+
+### 系统要求
+
+- 64 位 Windows 10 1809 或更高版本，或 Windows 11。
+- 不需要安装 Python。
+- 不需要联网。
+- 建议将软件放在有写入权限的普通本地文件夹中。
+
+### 启动步骤
+
+1. 找到 `ClassTeacherManager-v1.0.1-win64.zip`。
+2. 将 ZIP **完整解压**，不要直接在压缩包中运行。
+3. 打开解压后的 `ClassTeacherManager` 文件夹。
+4. 双击 `ClassTeacherManager.exe`。
+5. 首次启动可填写教师资料，也可以选择稍后设置。
+
+不能只复制 `ClassTeacherManager.exe`。程序还依赖同目录中的 `_internal` 文件夹及其中的 `resources` 和其他运行文件。
+
+当前本地成品位置：
+
+```text
+dist-python/ClassTeacherManager/ClassTeacherManager.exe
+dist-python/ClassTeacherManager-v1.0.1-win64.zip
+dist-python/ClassTeacherManager-v1.0.1-win64.zip.sha256
+```
+
+`dist-python/` 是本地构建目录，不提交到 GitHub 源码仓库。
+
+## 4. 从源码运行
+
+### 环境要求
+
+- 64 位 Windows 10/11。
+- 已安装 64 位 Python。当前正式版已使用 Python `3.14.6` 验证。
+- 建议使用项目独立虚拟环境，不要把依赖安装到系统 Python。
+
+### 安装与启动
+
+在项目根目录打开 PowerShell：
 
 ```powershell
 python -m venv .venv
+.venv\Scripts\python.exe -m pip install --upgrade pip
 .venv\Scripts\python.exe -m pip install -r requirements.txt
 .venv\Scripts\python.exe main.py
 ```
 
-## 数据位置
-
-- 源码运行时：`data/class_manager.db`
-- 打包运行时：`%LOCALAPPDATA%\LocalClassManager\class_manager.db`
-- 默认备份目录：源码运行时为 `backups/`；打包运行时为 `%LOCALAPPDATA%\LocalClassManager\backups\`
-- Excel 模板：`resources/templates/`
-
-请勿直接编辑、替换或删除数据库文件。请使用“数据备份与恢复”模块创建 ZIP 备份；恢复前系统会自动保存当前数据的一份安全备份。
-
-## 打包 exe
-
-双击 [打包当前版本.bat](打包当前版本.bat)，脚本会按需安装 PyInstaller，并生成当前 Python 版程序到：
+也可以双击：
 
 ```text
-dist-python/ClassTeacherManager/ClassTeacherManager.exe
+启动班主任管理系统.bat
 ```
 
-正式便携包会同时生成到：
+该脚本优先使用 `.venv\Scripts\python.exe`；不存在虚拟环境时会尝试调用系统 `python`。
+
+## 5. 推荐的首次使用流程
+
+1. 在教师信息窗口填写姓名、学校、任教学科和个人标记。
+2. 进入“学生数据中心”，新建班级或使用 Excel 批量导入学生。
+3. 检查学生学号、班级和家长联系人，必要时补充学生档案。
+4. 进入“课程表与日历”，建立当前学期、每日课时和教学班。
+5. 每次考试后进入“成绩管理”导入成绩 Excel，并查看排名与趋势。
+6. 学期末导入各班综合素质评价 Excel，完成五维统计、教师复核和锁定。
+7. 进入“数据备份与恢复”，创建完整 ZIP 备份；期末另建学期归档。
+
+## 6. 学生数据中心
+
+学生基础字段包括：姓名、性别、学号、班级、年级、座号、出生日期、身份证号、民族和备注。每名学生可以关联多个家长联系人，联系人可保存姓名、关系、联系电话、微信号、工作单位、家庭地址和备注。
+
+查询支持：
+
+- 学生姓名；
+- 学号；
+- 班级；
+- 家长联系电话。
+
+导出支持：
+
+- 全部学生；
+- 当前班级学生；
+- 家长通讯录。
+
+删除学生或班级前会要求教师确认。数据库使用软删除保存多数业务记录，降低误操作造成的数据丢失风险。
+
+## 7. Excel 导入规则
+
+### 7.1 学生信息
+
+正式模板：`resources/templates/学生信息导入模板.xlsx`
+
+必填列：
+
+- `姓名`
+- `班级`
+
+可选列包括性别、学号、年级、座号、出生日期、身份证号、民族、学生备注、家长姓名、关系、联系电话、微信号、工作单位、家庭地址和家长备注。
+
+导入时会检查：
+
+- 同班同学号重复；
+- 身份证号重复；
+- 必填字段缺失；
+- 日期和字段格式错误。
+
+结果窗口会分别显示成功、跳过和失败记录，并给出对应原因。
+
+### 7.2 成绩
+
+正式模板：`resources/templates/成绩导入模板.xlsx`
+
+支持学科：
 
 ```text
-dist-python/ClassTeacherManager-v1.0.1-win64.zip
+语文、数学、英语、物理、化学、政治、历史、地理、生物
 ```
 
-同目录会生成 `.zip.sha256` 校验文件。EXE 文件属性、程序侧栏和新建备份清单中的版本号均读取 `config.py` 的统一版本信息。便携包支持 Windows 10 1809 及以上的 64 位系统，使用前必须完整解压，不能只复制 EXE。
+每次考试只需要保留实际参加考试的学科，不要求九科齐全。Excel 第一张工作表必须有 `姓名` 和至少一门学科；`学号`、`班级`为可选列，但建议始终保留学号。
 
-## 文档与测试
+满分可以写在表头中：
 
-- 完整日常使用说明：[docs/使用说明.md](docs/使用说明.md)
-- 自动化测试：
+```text
+语文(120)
+数学（150）
+```
+
+“道德与法治”和“道法”会识别为政治。空白、缺考和未考不会写入该科成绩。考试名称、日期、学期和年级完全相同时，重复导入会更新该次考试数据，适合更正原表。
+
+匹配顺序：
+
+1. 班级 + 学号；
+2. 班级 + 姓名；
+3. 未建档学生自动建立；
+4. 没有班级列时进入“成绩导入班”。
+
+### 7.3 综合素质
+
+综合素质支持六张学期工作表：
+
+| 标准学期 | 可识别名称示例 |
+| --- | --- |
+| 初一上 | 七上、七年级上、初一上、初一上学期 |
+| 初一下 | 七下、七年级下、初一下、初一下学期 |
+| 初二上 | 八上、八年级上、初二上、初二上学期 |
+| 初二下 | 八下、八年级下、初二下、初二下学期 |
+| 初三上 | 九上、九年级上、初三上、初三上学期 |
+| 初三下 | 九下、九年级下、初三下、初三下学期 |
+
+每张表需要姓名和五个维度：
+
+```text
+思想品德、学业水平、身心健康、艺术素养、实践与创新
+```
+
+原始等级只使用 `A/B/C`；缺失学期或维度保存为 `N/A`。系统不会补分，也不会把不完整学期折算为满学期分数。
+
+最终评定以九下工作表名单为准。五个维度分别根据六学期累计分进行班级排名，同分使用相同名次，系统分档不会拆分同分组。教师可以调整最终 A/B/C 等级，但不能修改原始六学期等级、累计分或排名；核对后可锁定结果。
+
+详细规则见：[综合素质评价需求总结与完成度核对](docs/综合素质评价需求总结与完成度核对.md)。
+
+## 8. 成绩分析
+
+系统保存每次考试及其实际科目，可以在同一学期内持续比较：
+
+- **成绩总览**：总分、班级排名、年级排名和各科成绩；同分并列。
+- **学生趋势**：历次总分、班级排名、年级排名及变化。
+- **学生学科分析**：本次各科与班级均分的差异，标记相对优势和偏弱学科。
+- **班级趋势**：班级均分、年级均分和班级均分排名。
+- **学科趋势**：各科在多次考试中的平均分与相对上次变化。
+- **近期波动名单**：比较同学期最近两次考试，显示排名变化、总分和共同学科变化。
+
+当两次考试科目不同，系统会提示总分不可直接等价比较，但仍会比较双方共同参加的学科。
+
+## 9. 综合素质最终档案
+
+最终 Excel 可包含：
+
+- 六学期共 30 项原始评价；
+- 五个维度累计得分；
+- 五个维度班级排名；
+- 五个维度系统等级；
+- 教师确认后的最终等级；
+- 五维总分与班级总排名；
+- 缺失学期的 `N/A` 标记。
+
+导出工作簿包含“综合素质总表”“五维得分”“学期得分”和“最终评定”等工作表。锁定前请由教师核对名单、同分边界和人工调整结果。
+
+## 10. 课程表、日历与工作台
+
+课程表不依赖学生班级，可以独立建立多个教学班，并为每个教学班设置颜色。教学班也可以关联学生数据中心中的行政班，使当天课程自动出现在班级工作台。
+
+每个学期可以设置：
+
+- 学期名称；
+- 开始与结束日期；
+- 任意数量的每日课时；
+- 每节课的名称、顺序、开始和结束时间。
+
+课程表支持周一至周日。选择“全部教学班”时可按颜色汇总查看；切换到具体教学班后才能编辑课程。
+
+日历支持班级日程和全局日程。全局日程会出现在所有班级视图中，适合统一考试、年级会议等事项。
+
+今日工作台根据当前班级和系统当天日期汇总课程、日程、考勤、德育和近期考试波动学生。顶部日期为只读，不能手动修改。
+
+## 11. 数据位置与隐私
+
+### 源码运行
+
+```text
+data/class_manager.db
+backups/
+```
+
+### EXE 运行
+
+```text
+%LOCALAPPDATA%\LocalClassManager\data\class_manager.db
+%LOCALAPPDATA%\LocalClassManager\backups\
+```
+
+注意：
+
+- 不要在软件运行时手动替换数据库。
+- 不要将 `data/`、`backups/` 或导出的学生文件提交到 GitHub。
+- 学生姓名、联系方式、家庭地址、成绩和行为记录都应按学校要求妥善保存。
+- 更换电脑前先创建 ZIP 备份，再在新电脑中使用恢复功能。
+- 软件不包含云同步、账号登录或网络上传功能。
+
+`.gitignore` 已排除本地数据库、备份、虚拟环境、日志和构建产物。
+
+## 12. 数据备份与恢复
+
+完整备份会生成 ZIP，其中包含 SQLite 一致性快照、备份说明和 SHA-256 校验信息。学期归档会额外记录学期名称、日期范围及相关业务统计，但恢复时仍恢复到归档创建时的完整数据库状态。
+
+定时备份支持每天或每周执行。当前调度器只在软件运行期间工作，软件关闭后不会由 Windows 自动唤醒。
+
+恢复流程：
+
+1. 检查 ZIP 结构和文件路径安全性；
+2. 校验文件哈希；
+3. 检查 SQLite 数据库完整性；
+4. 创建“恢复前安全备份”；
+5. 替换当前数据库并重启软件。
+
+恢复会覆盖当前全部本地数据，必须由教师确认后执行。
+
+## 13. 项目结构
+
+```text
+班主任管理系统/
+├── main.py                         程序入口与启动诊断
+├── config.py                       版本号、资源和本地数据路径
+├── database/                       SQLite 连接、建表和兼容迁移
+├── models/                         SQLAlchemy 数据模型
+├── controllers/                    业务逻辑、统计、导入导出和备份
+├── views/                          PySide6 主窗口、模块页面和对话框
+├── utils/                          Excel 解析、评分、图标、布局和调度工具
+├── resources/
+│   ├── app.ico                     Windows 应用图标
+│   ├── styles.qss                  全局桌面样式
+│   ├── icons/                      Lucide SVG 图标及许可证
+│   └── templates/                  学生与成绩 Excel 模板
+├── tests/                          冒烟测试和可选视觉 QA
+├── docs/                           使用说明与业务规则文档
+├── build_exe.ps1                   PyInstaller 构建脚本
+├── 打包当前版本.bat                一键打包入口
+├── 启动班主任管理系统.bat          源码启动入口
+├── requirements.txt                固定核心依赖
+├── CHANGELOG.md                    版本更新记录
+└── 项目进度与下一步.md             后续开发交接文档
+```
+
+代码遵循分层结构：
+
+```text
+PySide6 View -> Controller -> SQLAlchemy Model -> SQLite
+                     |
+                     +-> Excel / Backup / Scoring Utils
+```
+
+新增模块时优先沿用现有模式：模型负责数据结构，控制器负责事务和业务规则，视图只负责交互与展示。
+
+## 14. 打包 Windows EXE
+
+关闭正在运行的程序，然后双击：
+
+```text
+打包当前版本.bat
+```
+
+或者执行：
 
 ```powershell
-.venv\Scripts\python.exe tests\smoke_test.py
-.venv\Scripts\python.exe tests\quality_smoke_test.py
-.venv\Scripts\python.exe tests\quality_import_smoke_test.py
-.venv\Scripts\python.exe tests\quality_finalization_smoke_test.py
-.venv\Scripts\python.exe tests\score_smoke_test.py
-.venv\Scripts\python.exe tests\attendance_smoke_test.py
-.venv\Scripts\python.exe tests\moral_smoke_test.py
-.venv\Scripts\python.exe tests\planner_smoke_test.py
-.venv\Scripts\python.exe tests\teaching_schedule_smoke_test.py
-.venv\Scripts\python.exe tests\teaching_schedule_ui_smoke_test.py
-.venv\Scripts\python.exe tests\backup_smoke_test.py
-.venv\Scripts\python.exe tests\backup_ui_smoke_test.py
-.venv\Scripts\python.exe tests\teacher_profile_smoke_test.py
+powershell -NoProfile -ExecutionPolicy Bypass -File .\build_exe.ps1
 ```
 
-## 项目结构
+构建脚本会：
 
-```text
-main.py              程序入口
-config.py            本地路径与数据库配置
-database/            SQLite 连接与初始化
-models/              SQLAlchemy 数据模型
-controllers/         业务逻辑
-views/               PySide6 界面
-utils/               Excel、评分与界面工具
-resources/           样式与 Excel 模板
-tests/               自动化测试
-docs/                使用说明
+1. 检查并调用 PyInstaller；
+2. 从 `config.py` 读取统一版本号；
+3. 写入 EXE 图标和 Windows 文件版本信息；
+4. 使用受控 DLL 搜索路径，避免构建机其他工具污染 Qt 依赖；
+5. 检查冲突的私有 ICU DLL；
+6. 生成便携目录、版本化 ZIP 和 SHA-256 文件。
+
+构建输出位于 `dist-python/`，中间产物位于 `build/`。这两个目录都可以重新生成，因此不会提交到 GitHub。
+
+## 15. 测试与质量检查
+
+当前共有 13 项业务冒烟测试：
+
+```powershell
+$tests = Get-ChildItem .\tests\*_smoke_test.py | Sort-Object Name
+foreach ($test in $tests) {
+    .venv\Scripts\python.exe $test.FullName
+    if ($LASTEXITCODE -ne 0) { throw "$($test.Name) failed" }
+}
 ```
+
+覆盖范围包括学生中心、综合素质、成绩、考勤、德育、课程表、日历、备份和教师信息。
+
+语法与依赖检查：
+
+```powershell
+.venv\Scripts\python.exe -m compileall -q main.py config.py controllers database models utils views tests
+.venv\Scripts\python.exe -m tabnanny main.py config.py controllers database models utils views tests
+.venv\Scripts\python.exe -m pip check
+git diff --check
+```
+
+可选视觉 QA：
+
+```powershell
+.venv\Scripts\python.exe tests\visual_qa_capture.py
+.venv\Scripts\python.exe tests\quality_final_visual_qa.py
+.venv\Scripts\python.exe tests\teacher_profile_visual_qa.py
+```
+
+生成的截图保存在 `build/visual-qa/`，不会进入 Git 仓库。视觉测试使用临时数据库和演示数据，不读取正式学生数据。
+
+## 16. 常见问题
+
+### EXE 提示 `DLL load failed while importing QtCore`
+
+请确认正在使用 `v1.0.1` 或更高版本，并且已经完整解压 ZIP。`v1.0.1` 已修复旧构建环境误收集不兼容 ICU DLL 的问题。
+
+若仍无法启动，程序会在 EXE 所在目录生成 `启动诊断.txt`。该文件只记录系统、程序版本和异常信息，不记录学生数据。
+
+### 源码启动提示缺少 PySide6 或 SQLAlchemy
+
+重新安装依赖：
+
+```powershell
+.venv\Scripts\python.exe -m pip install -r requirements.txt
+```
+
+### 更换程序目录后看不到原数据
+
+EXE 数据不保存在程序目录，而在 `%LOCALAPPDATA%\LocalClassManager\`。请从软件的备份中心导入原电脑生成的 ZIP，不要直接拼接两个数据库。
+
+### 定时备份没有在关机后执行
+
+当前定时备份依赖软件保持运行。Windows 任务计划程序级自动启动尚未实现。
+
+## 17. 当前限制与后续方向
+
+目前尚未完成：
+
+- PDF 导出；
+- 新学期整班升年级和完整学生就读历史；
+- 更细的成绩波动阈值、自动关注名单和期末分析报告；
+- Windows 任务计划程序级后台备份；
+- 安装程序和自动更新；
+- 网络同步、账号系统和多人协作。
+
+当前明确不开发家访、家长谈话和综合素质违纪扣分明细。综合素质原始等级由教师或教育局文件提供，系统负责匹配、保存、累计、排名和最终复核。
+
+后续优先级见：[项目进度与下一步](项目进度与下一步.md)。
+
+## 18. 文档索引
+
+- [日常使用说明](docs/使用说明.md)
+- [安装与启动说明](docs/安装与启动说明.txt)
+- [综合素质评价需求总结与完成度核对](docs/综合素质评价需求总结与完成度核对.md)
+- [下一阶段开发确认清单](docs/下一阶段开发确认清单.md)
+- [项目进度与下一步](项目进度与下一步.md)
+- [版本更新记录](CHANGELOG.md)
+
+第三方 Lucide 图标许可证保存在 `resources/icons/LICENSE-lucide.txt`。

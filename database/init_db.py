@@ -5,13 +5,13 @@ from models.base import Base
 
 # Import models so SQLAlchemy registers every table before create_all().
 from models import backup_record  # noqa: F401
+from models import attendance  # noqa: F401
 from models import class_group  # noqa: F401
 from models import exam  # noqa: F401
 from models import guardian  # noqa: F401
 from models import import_record  # noqa: F401
 from models import moral  # noqa: F401
 from models import quality  # noqa: F401
-from models import reserved  # noqa: F401
 from models import schedule  # noqa: F401
 from models import student  # noqa: F401
 from models import teacher_profile  # noqa: F401

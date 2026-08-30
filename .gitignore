@@ -11,7 +11,7 @@ venv/
 .coverage
 *.egg-info/
 
-# Package output created in the later EXE packaging stage.
+# Generated package and QA output.
 build/
 dist-python/
 dist-python-updated/
@@ -22,8 +22,3 @@ dist-python-workbench/
 *.db-shm
 *.db-wal
 *.log
-
-# Web prototype dependencies and generated build output.
-ui-prototype/node_modules/
-ui-prototype/dist/
-ui-prototype/package-lock.json

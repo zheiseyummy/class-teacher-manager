@@ -9,7 +9,7 @@ from sqlalchemy.orm import joinedload
 
 from database.connection import get_session
 from models.class_group import ClassGroup
-from models.reserved import LeaveRecord
+from models.attendance import LeaveRecord
 from models.student import Student
 from utils.excel_service import write_attendance_export
 

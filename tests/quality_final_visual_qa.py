@@ -28,7 +28,13 @@ def run() -> Path:
         from utils.quality_scoring import SEMESTER_RULES
         from views.quality_final_review_dialog import QualityFinalReviewDialog
 
-        output_path = Path(__file__).resolve().parents[1] / "docs" / "visual-qa-quality-final.png"
+        output_path = (
+            Path(__file__).resolve().parents[1]
+            / "build"
+            / "visual-qa"
+            / "visual-qa-quality-final.png"
+        )
+        output_path.parent.mkdir(parents=True, exist_ok=True)
         try:
             initialize_database()
             students = StudentController()

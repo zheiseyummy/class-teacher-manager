@@ -21,7 +21,6 @@ class ClassGroup(TimestampMixin, SoftDeleteMixin, Base):
     note: Mapped[str | None] = mapped_column(Text)
 
     students = relationship("Student", back_populates="class_group")
-    cadres = relationship("ClassCadre", back_populates="class_group")
     course_schedules = relationship("CourseSchedule", back_populates="class_group")
     calendar_events = relationship("CalendarEvent", back_populates="class_group")
 

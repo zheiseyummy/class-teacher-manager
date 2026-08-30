@@ -30,7 +30,8 @@ def run() -> tuple[Path, Path, Path]:
         from views.main_window import MainWindow
         from views.teacher_profile_dialog import TeacherProfileDialog
 
-        output_root = Path(__file__).resolve().parents[1] / "docs"
+        output_root = Path(__file__).resolve().parents[1] / "build" / "visual-qa"
+        output_root.mkdir(parents=True, exist_ok=True)
         window_path = output_root / "visual-qa-teacher-footer.png"
         dialog_path = output_root / "visual-qa-teacher-profile.png"
         compact_dialog_path = output_root / "visual-qa-teacher-profile-compact.png"

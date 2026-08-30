@@ -1,3 +1,4 @@
+from models.attendance import LeaveRecord
 from models.backup_record import BackupRecord, BackupSettings
 from models.class_group import ClassGroup
 from models.exam import Exam, ExamScore
@@ -11,7 +12,6 @@ from models.quality import (
     QualityRecord,
     QualityRosterEntry,
 )
-from models.reserved import ClassCadre, LeaveRecord
 from models.schedule import CalendarEvent, CourseSchedule
 from models.student import Student
 from models.teacher_profile import TeacherProfile
@@ -33,7 +33,6 @@ __all__ = [
     "QualityRecord",
     "QualityRosterEntry",
     "CalendarEvent",
-    "ClassCadre",
     "CourseSchedule",
     "AcademicSemester",
     "LeaveRecord",
