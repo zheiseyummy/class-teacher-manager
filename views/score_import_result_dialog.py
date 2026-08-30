@@ -13,15 +13,15 @@ from PySide6.QtWidgets import (
 )
 
 from controllers.score_controller import ScoreImportResult
-from utils.ui_layout import configure_resizable_table
+from utils.ui_layout import configure_resizable_table, configure_responsive_dialog
 
 
 class ScoreImportResultDialog(QDialog):
     def __init__(self, result: ScoreImportResult, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setWindowTitle("成绩 Excel 导入结果")
-        self.setMinimumSize(700, 410)
         self._build_ui(result)
+        configure_responsive_dialog(self, 700, 410, minimum_height=340)
 
     def _build_ui(self, result: ScoreImportResult) -> None:
         layout = QVBoxLayout(self)

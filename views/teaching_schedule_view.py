@@ -9,17 +9,21 @@ from PySide6.QtWidgets import (
     QAbstractItemView,
     QComboBox,
     QFrame,
+    QGridLayout,
     QHBoxLayout,
     QLabel,
     QMessageBox,
+    QMenu,
     QPushButton,
     QTableWidget,
     QTableWidgetItem,
     QVBoxLayout,
+    QToolButton,
     QWidget,
 )
 
 from controllers.teaching_schedule_controller import TeachingScheduleController, TeachingScheduleDataError
+from utils.ui_icons import lucide_icon
 from utils.ui_layout import configure_resizable_table
 from views.semester_period_manager_dialog import SemesterPeriodManagerDialog
 from views.teaching_course_dialog import TeachingCourseDialog
@@ -37,6 +41,7 @@ class TeachingScheduleView(QWidget):
         self._semesters: list[dict[str, Any]] = []
         self._groups: list[dict[str, Any]] = []
         self._periods: list[dict[str, Any]] = []
+        self._compact_mode = False
         self._build_ui()
         self.refresh_all()
 
@@ -47,46 +52,66 @@ class TeachingScheduleView(QWidget):
 
         toolbar = QFrame()
         toolbar.setObjectName("plannerToolbar")
-        toolbar_layout = QHBoxLayout(toolbar)
-        toolbar_layout.setContentsMargins(16, 12, 16, 12)
-        toolbar_layout.setSpacing(10)
+        self.toolbar_layout = QGridLayout(toolbar)
+        self.toolbar_layout.setContentsMargins(12, 10, 12, 10)
+        self.toolbar_layout.setHorizontalSpacing(8)
+        self.toolbar_layout.setVerticalSpacing(8)
 
-        title = QLabel("独立课程表")
-        title.setObjectName("sectionTitle")
-        toolbar_layout.addWidget(title)
+        self.toolbar_title = QLabel("课程范围")
+        self.toolbar_title.setObjectName("toolbarContext")
+        self.toolbar_layout.addWidget(self.toolbar_title, 0, 0)
 
         self.semester_box = QComboBox()
         self.semester_box.setMinimumWidth(238)
         self.semester_box.currentIndexChanged.connect(self._on_semester_changed)
-        toolbar_layout.addWidget(self.semester_box)
+        self.toolbar_layout.addWidget(self.semester_box, 0, 1)
 
         self.group_box = QComboBox()
         self.group_box.setMinimumWidth(176)
         self.group_box.currentIndexChanged.connect(self._on_group_changed)
-        toolbar_layout.addWidget(self.group_box)
+        self.toolbar_layout.addWidget(self.group_box, 0, 2)
 
         self.group_color_swatch = QFrame()
         self.group_color_swatch.setObjectName("classColorSwatch")
         self.group_color_swatch.setFixedSize(18, 18)
-        toolbar_layout.addWidget(self.group_color_swatch)
-        toolbar_layout.addStretch(1)
+        self.toolbar_layout.addWidget(self.group_color_swatch, 0, 3)
+        self.toolbar_layout.setColumnStretch(4, 1)
 
-        group_button = QPushButton("管理教学班")
-        group_button.clicked.connect(self._manage_groups)
-        toolbar_layout.addWidget(group_button)
+        self.group_button = QPushButton("管理教学班")
+        self.group_button.clicked.connect(self._manage_groups)
+        self.toolbar_layout.addWidget(self.group_button, 0, 5)
 
-        settings_button = QPushButton("学期与课时")
-        settings_button.clicked.connect(self._manage_semesters_and_periods)
-        toolbar_layout.addWidget(settings_button)
+        self.settings_button = QPushButton("学期与课时")
+        self.settings_button.clicked.connect(self._manage_semesters_and_periods)
+        self.toolbar_layout.addWidget(self.settings_button, 0, 6)
 
         self.add_course_button = QPushButton("新增课程")
         self.add_course_button.setObjectName("primaryButton")
         self.add_course_button.clicked.connect(self._add_or_edit_course)
-        toolbar_layout.addWidget(self.add_course_button)
+        self.add_course_button.setIcon(
+            lucide_icon("calendar-plus", color="#FFFFFF", active_color="#FFFFFF")
+        )
+        self.toolbar_layout.addWidget(self.add_course_button, 0, 7)
 
         self.delete_course_button = QPushButton("删除所选课程")
+        self.delete_course_button.setObjectName("dangerButton")
         self.delete_course_button.clicked.connect(self._delete_selected_course)
-        toolbar_layout.addWidget(self.delete_course_button)
+        self.toolbar_layout.addWidget(self.delete_course_button, 0, 8)
+
+        self.more_button = QToolButton()
+        self.more_button.setObjectName("moreButton")
+        self.more_button.setText("更多")
+        self.more_button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+        self.more_button.setIcon(lucide_icon("clipboard-check"))
+        self.more_button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        more_menu = QMenu(self.more_button)
+        more_menu.addAction("管理教学班", self._manage_groups)
+        more_menu.addAction("学期与课时", self._manage_semesters_and_periods)
+        more_menu.addSeparator()
+        more_menu.addAction("删除所选课程", self._delete_selected_course)
+        self.more_button.setMenu(more_menu)
+        self.more_button.setVisible(False)
+        self.toolbar_layout.addWidget(self.more_button, 0, 9)
         layout.addWidget(toolbar)
 
         self.status_line = QLabel()
@@ -354,3 +379,47 @@ class TeachingScheduleView(QWidget):
         if course["note"]:
             lines.append(f"备注：{course['note']}")
         return "\n".join(lines)
+
+    def set_compact_mode(self, compact: bool) -> None:
+        if compact == self._compact_mode:
+            return
+        self._compact_mode = compact
+        self.toolbar_title.setVisible(not compact)
+        self.group_button.setVisible(not compact)
+        self.settings_button.setVisible(not compact)
+        self.delete_course_button.setVisible(not compact)
+        self.more_button.setVisible(compact)
+
+        toolbar_widgets = (
+            self.semester_box,
+            self.group_box,
+            self.group_color_swatch,
+            self.group_button,
+            self.settings_button,
+            self.add_course_button,
+            self.delete_course_button,
+            self.more_button,
+        )
+        for widget in toolbar_widgets:
+            self.toolbar_layout.removeWidget(widget)
+        if compact:
+            self.semester_box.setMinimumWidth(0)
+            self.group_box.setMinimumWidth(0)
+            self.toolbar_layout.addWidget(self.semester_box, 0, 0, 1, 3)
+            self.toolbar_layout.addWidget(self.group_box, 1, 0, 1, 2)
+            self.toolbar_layout.addWidget(self.group_color_swatch, 1, 2)
+            self.toolbar_layout.addWidget(self.add_course_button, 2, 0, 1, 2)
+            self.toolbar_layout.addWidget(self.more_button, 2, 2)
+            self.toolbar_layout.setColumnStretch(0, 1)
+        else:
+            self.semester_box.setMinimumWidth(238)
+            self.group_box.setMinimumWidth(176)
+            self.toolbar_layout.addWidget(self.semester_box, 0, 1)
+            self.toolbar_layout.addWidget(self.group_box, 0, 2)
+            self.toolbar_layout.addWidget(self.group_color_swatch, 0, 3)
+            self.toolbar_layout.addWidget(self.group_button, 0, 5)
+            self.toolbar_layout.addWidget(self.settings_button, 0, 6)
+            self.toolbar_layout.addWidget(self.add_course_button, 0, 7)
+            self.toolbar_layout.addWidget(self.delete_course_button, 0, 8)
+            self.toolbar_layout.setColumnStretch(4, 1)
+        self.course_table.setMinimumHeight(340 if compact else 470)

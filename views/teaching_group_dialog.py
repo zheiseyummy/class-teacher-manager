@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
 
 from controllers.teaching_schedule_controller import TeachingScheduleController, TeachingScheduleDataError
 from utils.class_colors import CLASS_COLOR_CHOICES
+from utils.ui_layout import configure_responsive_dialog
 
 
 class TeachingGroupDialog(QDialog):
@@ -31,8 +32,8 @@ class TeachingGroupDialog(QDialog):
         self.group_id = group_id
         self.saved_group_id: int | None = None
         self.setWindowTitle("编辑教学班" if group_id is not None else "新增教学班")
-        self.setMinimumWidth(470)
         self._build_ui()
+        configure_responsive_dialog(self, 470)
         if group_id is not None:
             self._load_group(group_id)
 

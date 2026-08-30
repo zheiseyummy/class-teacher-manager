@@ -21,7 +21,7 @@ from PySide6.QtWidgets import (
 )
 
 from controllers.student_controller import StudentController, StudentDataError
-from utils.ui_layout import configure_resizable_table
+from utils.ui_layout import configure_resizable_table, configure_responsive_dialog
 
 
 class ClassEditDialog(QDialog):
@@ -30,8 +30,8 @@ class ClassEditDialog(QDialog):
         self.controller = controller
         self.class_data = class_data
         self.setWindowTitle("编辑班级" if class_data else "新增班级")
-        self.setMinimumWidth(460)
         self._build_ui()
+        configure_responsive_dialog(self, 460)
         if class_data:
             self._load_data(class_data)
 
@@ -104,8 +104,8 @@ class ClassManagementDialog(QDialog):
         self.controller = controller
         self.class_rows: list[dict[str, Any]] = []
         self.setWindowTitle("班级管理")
-        self.resize(760, 500)
         self._build_ui()
+        configure_responsive_dialog(self, 760, 500, minimum_height=360)
         self.reload()
 
     def _build_ui(self) -> None:
@@ -136,6 +136,7 @@ class ClassManagementDialog(QDialog):
         actions.addStretch(1)
         edit_button = QPushButton("编辑")
         delete_button = QPushButton("删除")
+        delete_button.setObjectName("dangerButton")
         edit_button.clicked.connect(self._edit_class)
         delete_button.clicked.connect(self._delete_class)
         actions.addWidget(edit_button)

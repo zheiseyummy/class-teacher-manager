@@ -6,6 +6,7 @@ from PySide6.QtWidgets import (
     QAbstractItemView,
     QComboBox,
     QDialog,
+    QGridLayout,
     QHBoxLayout,
     QLabel,
     QLineEdit,
@@ -18,7 +19,7 @@ from PySide6.QtWidgets import (
 
 from controllers.quality_controller import QualityController, QualityDataError
 from utils.quality_scoring import FINAL_LEVELS, formatted_score
-from utils.ui_layout import configure_resizable_table
+from utils.ui_layout import configure_resizable_table, configure_responsive_dialog
 
 
 class QualityFinalReviewDialog(QDialog):
@@ -48,9 +49,8 @@ class QualityFinalReviewDialog(QDialog):
         self.initial_class_id = initial_class_id
         self.review_data: dict | None = None
         self.setWindowTitle("综合素质最终评定")
-        self.setMinimumSize(1080, 650)
-        self.resize(1260, 760)
         self._build_ui()
+        configure_responsive_dialog(self, 1260, 760, minimum_height=480)
         self._load_filters()
         self.refresh()
 
@@ -59,31 +59,35 @@ class QualityFinalReviewDialog(QDialog):
         layout.setContentsMargins(24, 22, 24, 20)
         layout.setSpacing(14)
 
-        top = QHBoxLayout()
-        top.setSpacing(10)
         title = QLabel("最终五维评定")
         title.setObjectName("detailName")
-        top.addWidget(title)
-        top.addStretch(1)
+        layout.addWidget(title)
+
+        filters = QGridLayout()
+        filters.setHorizontalSpacing(10)
+        filters.setVerticalSpacing(8)
         self.class_box = QComboBox()
-        self.class_box.setMinimumWidth(150)
+        self.class_box.setMinimumWidth(0)
         self.class_box.currentIndexChanged.connect(self.refresh)
-        top.addWidget(self.class_box)
+        filters.addWidget(self.class_box, 0, 0)
         self.dimension_box = QComboBox()
-        self.dimension_box.setMinimumWidth(150)
+        self.dimension_box.setMinimumWidth(0)
         self.dimension_box.currentIndexChanged.connect(self.refresh)
-        top.addWidget(self.dimension_box)
+        filters.addWidget(self.dimension_box, 0, 1)
         self.search_input = QLineEdit()
         self.search_input.setPlaceholderText("搜索姓名或学号...")
-        self.search_input.setMinimumWidth(190)
+        self.search_input.setMinimumWidth(0)
         self.search_input.textChanged.connect(self.refresh)
-        top.addWidget(self.search_input)
-        layout.addLayout(top)
+        filters.addWidget(self.search_input, 1, 0, 1, 2)
+        filters.setColumnStretch(0, 1)
+        filters.setColumnStretch(1, 1)
+        layout.addLayout(filters)
 
-        status_row = QHBoxLayout()
         self.state_label = QLabel("尚未生成")
         self.state_label.setObjectName("finalReviewState")
-        status_row.addWidget(self.state_label)
+        self.state_label.setWordWrap(True)
+        layout.addWidget(self.state_label)
+        status_row = QHBoxLayout()
         status_row.addStretch(1)
         self.generate_button = QPushButton("重新计算")
         self.generate_button.setObjectName("secondaryButton")
@@ -97,6 +101,7 @@ class QualityFinalReviewDialog(QDialog):
 
         self.summary_label = QLabel("A 0 人 · B 0 人 · C 0 人")
         self.summary_label.setObjectName("finalReviewSummary")
+        self.summary_label.setWordWrap(True)
         layout.addWidget(self.summary_label)
 
         self.table = QTableWidget(0, len(self.headers))
@@ -115,6 +120,7 @@ class QualityFinalReviewDialog(QDialog):
 
         self.hint_label = QLabel("黄色行表示六学期数据不完整；N/A 不折算，累计分按已有学期计算。")
         self.hint_label.setObjectName("mutedLabel")
+        self.hint_label.setWordWrap(True)
         layout.addWidget(self.hint_label)
 
     def _load_filters(self) -> None:

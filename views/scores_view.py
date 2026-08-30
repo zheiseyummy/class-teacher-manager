@@ -10,14 +10,18 @@ from PySide6.QtWidgets import (
     QComboBox,
     QFileDialog,
     QFrame,
+    QGridLayout,
     QHBoxLayout,
     QLabel,
     QMessageBox,
+    QMenu,
     QPushButton,
     QSplitter,
+    QStackedWidget,
     QTableWidget,
     QTableWidgetItem,
     QTabWidget,
+    QToolButton,
     QVBoxLayout,
     QWidget,
 )
@@ -25,9 +29,11 @@ from PySide6.QtWidgets import (
 from config import SCORE_IMPORT_TEMPLATE
 from controllers.score_controller import ScoreController, ScoreDataError
 from utils.score_excel_import import ensure_score_import_template
-from utils.ui_layout import configure_resizable_table, restore_splitter
+from utils.ui_icons import lucide_icon
+from utils.ui_layout import configure_resizable_table, restore_splitter, set_compact_columns
 from views.score_import_dialog import ScoreImportDialog
 from views.score_import_result_dialog import ScoreImportResultDialog
+from views.ui_components import EmptyState, scrollable_detail
 
 
 class ScoresView(QWidget):
@@ -38,6 +44,7 @@ class ScoresView(QWidget):
         self.controller = ScoreController()
         self.overview_rows: list[dict[str, Any]] = []
         self.current_exam_id: int | None = None
+        self._compact_mode = False
         self._build_ui()
         self._refresh_filters()
         self.reload()
@@ -47,51 +54,88 @@ class ScoresView(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(12)
 
-        toolbar = QHBoxLayout()
-        title = QLabel("成绩管理")
-        title.setObjectName("sectionTitle")
-        toolbar.addWidget(title)
-        toolbar.addStretch(1)
+        toolbar_frame = QFrame()
+        toolbar_frame.setObjectName("moduleToolbar")
+        self.toolbar_layout = QGridLayout(toolbar_frame)
+        self.toolbar_layout.setContentsMargins(12, 8, 12, 8)
+        self.toolbar_layout.setHorizontalSpacing(8)
+        self.toolbar_context = QLabel("分析范围")
+        self.toolbar_context.setObjectName("toolbarContext")
+        self.toolbar_layout.addWidget(self.toolbar_context, 0, 0)
+        self.toolbar_layout.setColumnStretch(0, 1)
         self.class_filter = QComboBox()
         self.class_filter.setObjectName("classFilter")
         self.class_filter.setMinimumWidth(150)
         self.class_filter.currentIndexChanged.connect(self.reload)
-        toolbar.addWidget(self.class_filter)
-        template_button = QPushButton("成绩模板")
-        template_button.clicked.connect(self._open_template)
-        toolbar.addWidget(template_button)
-        import_button = QPushButton("导入成绩")
-        import_button.setObjectName("primaryButton")
-        import_button.clicked.connect(self._import_scores)
-        toolbar.addWidget(import_button)
-        layout.addLayout(toolbar)
+        self.toolbar_layout.addWidget(self.class_filter, 0, 1)
+        self.template_button = QPushButton("成绩模板")
+        self.template_button.setIcon(lucide_icon("file-down"))
+        self.template_button.clicked.connect(self._open_template)
+        self.toolbar_layout.addWidget(self.template_button, 0, 2)
+        self.import_button = QPushButton("导入成绩")
+        self.import_button.setObjectName("primaryButton")
+        self.import_button.setIcon(
+            lucide_icon("file-up", color="#FFFFFF", active_color="#FFFFFF")
+        )
+        self.import_button.clicked.connect(self._import_scores)
+        self.toolbar_layout.addWidget(self.import_button, 0, 3)
+        self.more_button = QToolButton()
+        self.more_button.setObjectName("moreButton")
+        self.more_button.setText("更多")
+        self.more_button.setIcon(lucide_icon("clipboard-check"))
+        self.more_button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+        self.more_button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        more_menu = QMenu(self.more_button)
+        more_menu.addAction(lucide_icon("file-down"), "打开成绩模板", self._open_template)
+        self.more_button.setMenu(more_menu)
+        self.more_button.setVisible(False)
+        self.toolbar_layout.addWidget(self.more_button, 0, 4)
+        layout.addWidget(toolbar_frame)
 
-        exam_row = QHBoxLayout()
-        exam_label = QLabel("考试批次")
-        exam_label.setObjectName("summaryText")
-        exam_row.addWidget(exam_label)
+        exam_frame = QFrame()
+        exam_frame.setObjectName("filterBar")
+        self.exam_layout = QGridLayout(exam_frame)
+        self.exam_layout.setContentsMargins(12, 9, 12, 9)
+        self.exam_layout.setHorizontalSpacing(10)
+        self.exam_layout.setVerticalSpacing(6)
+        self.exam_label = QLabel("考试批次")
+        self.exam_label.setObjectName("toolbarContext")
+        self.exam_layout.addWidget(self.exam_label, 0, 0)
         self.exam_box = QComboBox()
         self.exam_box.setMinimumWidth(360)
         self.exam_box.currentIndexChanged.connect(self._on_exam_changed)
-        exam_row.addWidget(self.exam_box)
-        exam_row.addStretch(1)
+        self.exam_layout.addWidget(self.exam_box, 0, 1)
+        self.exam_layout.setColumnStretch(2, 1)
         self.student_count_label = QLabel("学生 0 人")
         self.student_count_label.setObjectName("summaryText")
         self.average_label = QLabel("班均分 -")
         self.average_label.setObjectName("summaryText")
         self.highest_label = QLabel("最高分 -")
         self.highest_label.setObjectName("summaryText")
-        exam_row.addWidget(self.student_count_label)
-        exam_row.addWidget(self.average_label)
-        exam_row.addWidget(self.highest_label)
-        layout.addLayout(exam_row)
+        self.exam_layout.addWidget(self.student_count_label, 0, 3)
+        self.exam_layout.addWidget(self.average_label, 0, 4)
+        self.exam_layout.addWidget(self.highest_label, 0, 5)
+        layout.addWidget(exam_frame)
 
         self.tabs = QTabWidget()
         self.tabs.addTab(self._build_overview_tab(), "成绩总览")
         self.tabs.addTab(self._build_subject_tab(), "学科分析")
         self.tabs.addTab(self._build_subject_trend_tab(), "学科趋势")
         self.tabs.addTab(self._build_class_trend_tab(), "班级趋势")
-        layout.addWidget(self.tabs, 1)
+        self.content_stack = QStackedWidget()
+        self.content_stack.setObjectName("dataStateStack")
+        self.content_stack.addWidget(self.tabs)
+        self.empty_state = EmptyState(
+            icon_name="chart-no-axes-column-increasing",
+            action=self._import_scores,
+        )
+        self.empty_state.set_content(
+            "还没有考试成绩",
+            "导入一份包含学号和实际考试科目的 Excel，即可开始班级、年级和学生趋势分析。",
+            "导入成绩",
+        )
+        self.content_stack.addWidget(self.empty_state)
+        layout.addWidget(self.content_stack, 1)
 
     def _build_overview_tab(self) -> QWidget:
         page = QWidget()
@@ -158,7 +202,8 @@ class ScoresView(QWidget):
         self.detail_splitter.addWidget(subject_panel)
         restore_splitter(self.detail_splitter, "scores_detail", [210, 210])
         detail_layout.addWidget(self.detail_splitter, 1)
-        self.overview_splitter.addWidget(detail)
+        self.detail_scroll = scrollable_detail(detail, name="scoreDetailScroll")
+        self.overview_splitter.addWidget(self.detail_scroll)
         self.overview_splitter.setStretchFactor(0, 3)
         self.overview_splitter.setStretchFactor(1, 2)
         restore_splitter(self.overview_splitter, "scores_main", [760, 430])
@@ -235,6 +280,7 @@ class ScoresView(QWidget):
             self._clear_tables()
             return
         self.overview_rows = dashboard["rows"]
+        self.content_stack.setCurrentWidget(self.tabs)
         self._populate_overview(dashboard["subjects"], dashboard["rows"])
         self._populate_subjects(dashboard["subject_stats"])
         self._populate_class_trends()
@@ -262,6 +308,11 @@ class ScoresView(QWidget):
         self.overview_table.setColumnWidth(4, 84)
         self.overview_table.setColumnWidth(5, 84)
         self.overview_table.blockSignals(False)
+        set_compact_columns(
+            self.overview_table,
+            (1, 2, *range(6, len(headers))),
+            self._compact_mode,
+        )
 
     def _populate_subjects(self, rows: list[dict[str, Any]]) -> None:
         self.subject_table.setRowCount(len(rows))
@@ -353,6 +404,7 @@ class ScoresView(QWidget):
         self.average_label.setText("班均分 -")
         self.highest_label.setText("最高分 -")
         self._clear_student_detail()
+        self.content_stack.setCurrentWidget(self.empty_state)
 
     def _clear_student_detail(self) -> None:
         self.student_name_label.setText("选择学生")
@@ -374,3 +426,48 @@ class ScoresView(QWidget):
         if isinstance(value, float):
             return f"{value:.2f}".rstrip("0").rstrip(".")
         return str(value)
+
+    def set_compact_mode(self, compact: bool) -> None:
+        if compact == self._compact_mode:
+            return
+        self._compact_mode = compact
+        self.toolbar_context.setVisible(not compact)
+        self.template_button.setVisible(not compact)
+        self.more_button.setVisible(compact)
+        self.class_filter.setMinimumWidth(110 if compact else 150)
+
+        exam_widgets = (
+            self.exam_label,
+            self.exam_box,
+            self.student_count_label,
+            self.average_label,
+            self.highest_label,
+        )
+        for widget in exam_widgets:
+            self.exam_layout.removeWidget(widget)
+        if compact:
+            self.exam_label.setVisible(False)
+            self.exam_box.setMinimumWidth(0)
+            self.exam_layout.addWidget(self.exam_box, 0, 0, 1, 3)
+            self.exam_layout.addWidget(self.student_count_label, 1, 0)
+            self.exam_layout.addWidget(self.average_label, 1, 1)
+            self.exam_layout.addWidget(self.highest_label, 1, 2)
+        else:
+            self.exam_label.setVisible(True)
+            self.exam_box.setMinimumWidth(360)
+            self.exam_layout.addWidget(self.exam_label, 0, 0)
+            self.exam_layout.addWidget(self.exam_box, 0, 1)
+            self.exam_layout.addWidget(self.student_count_label, 0, 3)
+            self.exam_layout.addWidget(self.average_label, 0, 4)
+            self.exam_layout.addWidget(self.highest_label, 0, 5)
+
+        self.overview_splitter.setOrientation(
+            Qt.Orientation.Vertical if compact else Qt.Orientation.Horizontal
+        )
+        if self.overview_table.columnCount():
+            set_compact_columns(
+                self.overview_table,
+                (1, 2, *range(6, self.overview_table.columnCount())),
+                compact,
+            )
+        self.overview_splitter.setSizes([300, 430] if compact else [760, 430])

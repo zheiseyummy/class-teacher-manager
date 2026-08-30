@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
 )
 
 from controllers.planner_controller import PlannerController, PlannerDataError
+from utils.ui_layout import configure_responsive_dialog
 
 
 class CalendarEventDialog(QDialog):
@@ -37,8 +38,8 @@ class CalendarEventDialog(QDialog):
         self.event_id = event_id
         self.saved_event_id: int | None = None
         self.setWindowTitle("编辑日程" if event_id is not None else "新增日程")
-        self.setMinimumWidth(480)
         self._build_ui()
+        configure_responsive_dialog(self, 480)
         if event_id is not None:
             self._load_event(event_id)
         else:

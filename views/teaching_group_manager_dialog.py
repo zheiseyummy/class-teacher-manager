@@ -16,7 +16,7 @@ from PySide6.QtWidgets import (
 )
 
 from controllers.teaching_schedule_controller import TeachingScheduleController, TeachingScheduleDataError
-from utils.ui_layout import configure_resizable_table
+from utils.ui_layout import configure_resizable_table, configure_responsive_dialog
 from views.teaching_group_dialog import TeachingGroupDialog
 
 
@@ -28,9 +28,8 @@ class TeachingGroupManagerDialog(QDialog):
         self.controller = controller
         self.changed = False
         self.setWindowTitle("管理教学班")
-        self.resize(820, 500)
-        self.setMinimumSize(680, 420)
         self._build_ui()
+        configure_responsive_dialog(self, 820, 500, minimum_height=360)
         self.refresh()
 
     def _build_ui(self) -> None:
@@ -53,6 +52,7 @@ class TeachingGroupManagerDialog(QDialog):
         edit_button.clicked.connect(self._edit_group)
         header.addWidget(edit_button)
         delete_button = QPushButton("删除")
+        delete_button.setObjectName("dangerButton")
         delete_button.clicked.connect(self._delete_group)
         header.addWidget(delete_button)
         layout.addLayout(header)

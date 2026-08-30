@@ -51,6 +51,9 @@ class StudentDetailPane(QFrame):
         header.addStretch(1)
         self.edit_button = QPushButton("编辑")
         self.delete_button = QPushButton("删除")
+        self.delete_button.setObjectName("dangerButton")
+        self.edit_button.setToolTip("请先从学生列表选择一名学生")
+        self.delete_button.setToolTip("请先从学生列表选择一名学生")
         self.edit_button.clicked.connect(self._edit_student)
         self.delete_button.clicked.connect(self._delete_student)
         header.addWidget(self.edit_button)
@@ -98,6 +101,8 @@ class StudentDetailPane(QFrame):
         self.contacts.setRowCount(0)
         self.edit_button.setEnabled(False)
         self.delete_button.setEnabled(False)
+        self.edit_button.setToolTip("请先从学生列表选择一名学生")
+        self.delete_button.setToolTip("请先从学生列表选择一名学生")
 
     def load_student(self, student_id: int) -> None:
         try:
@@ -128,6 +133,8 @@ class StudentDetailPane(QFrame):
                 self.contacts.setItem(row_index, column, QTableWidgetItem(value))
         self.edit_button.setEnabled(True)
         self.delete_button.setEnabled(True)
+        self.edit_button.setToolTip("编辑该学生档案与联系人")
+        self.delete_button.setToolTip("删除该学生档案，需要再次确认")
 
     def _edit_student(self) -> None:
         if self.student_id is None:

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from PySide6.QtCore import QAbstractTableModel, QModelIndex, Qt, Signal
+from PySide6.QtGui import QFont
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QFrame,
@@ -8,16 +9,18 @@ from PySide6.QtWidgets import (
     QLabel,
     QMessageBox,
     QSplitter,
+    QStackedWidget,
     QTableView,
     QVBoxLayout,
     QWidget,
 )
 
 from controllers.student_controller import StudentController
-from utils.ui_layout import configure_resizable_table, restore_splitter
+from utils.ui_layout import configure_resizable_table, restore_splitter, set_compact_columns
 from views.class_dialog import ClassManagementDialog
 from views.student_detail_pane import StudentDetailPane
 from views.student_form_dialog import StudentFormDialog
+from views.ui_components import EmptyState, scrollable_detail
 
 
 class StudentTableModel(QAbstractTableModel):
@@ -34,7 +37,13 @@ class StudentTableModel(QAbstractTableModel):
         return len(self.headers)
 
     def data(self, index: QModelIndex, role: int = Qt.ItemDataRole.DisplayRole):
-        if not index.isValid() or role not in (Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.EditRole):
+        if not index.isValid():
+            return None
+        if role == Qt.ItemDataRole.FontRole and index.column() == 1:
+            font = QFont()
+            font.setWeight(QFont.Weight.DemiBold)
+            return font
+        if role not in (Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.EditRole):
             return None
         return self.rows[index.row()].get(self.headers[index.column()], "")
 
@@ -63,6 +72,7 @@ class StudentsView(QWidget):
     """The student data center: list, filter result, and student archive pane."""
 
     classes_changed = Signal()
+    filters_clear_requested = Signal()
 
     def __init__(self) -> None:
         super().__init__()
@@ -70,6 +80,8 @@ class StudentsView(QWidget):
         self.model = StudentTableModel()
         self.search_text = ""
         self.class_id: int | None = None
+        self._empty_action_mode = ""
+        self._compact_mode = False
         self._build_ui()
         self.reload()
 
@@ -114,12 +126,21 @@ class StudentsView(QWidget):
         self.table.setColumnWidth(6, 58)
         self.table.setColumnWidth(7, 142)
         self.table.clicked.connect(self._show_selected_student)
-        table_layout.addWidget(self.table)
+        self.table_stack = QStackedWidget()
+        self.table_stack.setObjectName("dataStateStack")
+        self.table_stack.addWidget(self.table)
+        self.empty_state = EmptyState(
+            icon_name="users-round",
+            action=self._handle_empty_action,
+        )
+        self.table_stack.addWidget(self.empty_state)
+        table_layout.addWidget(self.table_stack)
         self.main_splitter.addWidget(table_frame)
 
         self.detail_pane = StudentDetailPane(self.controller)
         self.detail_pane.data_changed.connect(self._reload_after_detail_change)
-        self.main_splitter.addWidget(self.detail_pane)
+        self.detail_scroll = scrollable_detail(self.detail_pane, name="studentDetailScroll")
+        self.main_splitter.addWidget(self.detail_scroll)
         self.main_splitter.setStretchFactor(0, 3)
         self.main_splitter.setStretchFactor(1, 2)
         restore_splitter(self.main_splitter, "students_main", [720, 420])
@@ -137,8 +158,34 @@ class StudentsView(QWidget):
         rows = self.controller.search_students(self.search_text, self.class_id)
         self.model.set_rows(rows)
         self.count_label.setText(f"学生 {len(rows)} 人")
-        self.class_label.setText(f"班级 {self.controller.count_classes()} 个")
+        class_count = self.controller.count_classes()
+        self.class_label.setText(f"班级 {class_count} 个")
         self.detail_pane.clear()
+        if rows:
+            self.table_stack.setCurrentWidget(self.table)
+            return
+        self.table_stack.setCurrentWidget(self.empty_state)
+        if class_count == 0:
+            self._empty_action_mode = "classes"
+            self.empty_state.set_content(
+                "先建立第一个班级",
+                "班级是学生档案、成绩和评价的共同范围，建立后即可新增或导入学生。",
+                "管理班级",
+            )
+        elif self.search_text.strip() or self.class_id is not None:
+            self._empty_action_mode = "filters"
+            self.empty_state.set_content(
+                "没有匹配的学生",
+                "请检查姓名、学号、家长电话或当前班级筛选条件。",
+                "清除筛选",
+            )
+        else:
+            self._empty_action_mode = "student"
+            self.empty_state.set_content(
+                "班级中还没有学生",
+                "可以逐个新增学生，也可以使用统一 Excel 模板批量导入。",
+                "新增学生",
+            )
 
     def _reload_after_detail_change(self) -> None:
         selected_id = self.detail_pane.student_id
@@ -173,3 +220,27 @@ class StudentsView(QWidget):
                 self.table.setCurrentIndex(index)
                 self._show_selected_student(index)
                 return
+
+    def _handle_empty_action(self) -> None:
+        if self._empty_action_mode == "classes":
+            self.open_class_manager()
+        elif self._empty_action_mode == "filters":
+            self.filters_clear_requested.emit()
+        elif self._empty_action_mode == "student":
+            self.open_add_student()
+
+    def set_compact_mode(self, compact: bool) -> None:
+        if compact == self._compact_mode:
+            return
+        self._compact_mode = compact
+        self.main_splitter.setOrientation(
+            Qt.Orientation.Vertical if compact else Qt.Orientation.Horizontal
+        )
+        set_compact_columns(self.table, (0, 2, 5, 6, 7, 8), compact)
+        if compact:
+            self.table.setColumnWidth(1, 92)
+            self.table.setColumnWidth(3, 104)
+            self.table.setColumnWidth(4, 112)
+            self.main_splitter.setSizes([300, 360])
+        else:
+            self.main_splitter.setSizes([720, 420])

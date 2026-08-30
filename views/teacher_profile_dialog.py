@@ -9,6 +9,7 @@ from PySide6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
     QFormLayout,
+    QFrame,
     QGridLayout,
     QHBoxLayout,
     QLabel,
@@ -17,6 +18,7 @@ from PySide6.QtWidgets import (
     QListWidgetItem,
     QMessageBox,
     QPushButton,
+    QScrollArea,
     QVBoxLayout,
     QWidget,
 )
@@ -26,6 +28,7 @@ from controllers.teacher_profile_controller import (
     TeacherProfileDataError,
 )
 from utils.ui_icons import lucide_icon
+from utils.ui_layout import configure_responsive_dialog
 
 
 class TeacherProfileDialog(QDialog):
@@ -46,14 +49,21 @@ class TeacherProfileDialog(QDialog):
         self.subject_checks: dict[str, QCheckBox] = {}
         self.saved_profile: dict[str, Any] | None = None
         self.setWindowTitle("首次使用设置" if onboarding else "教师信息")
-        self.resize(640, 680)
-        self.setMinimumSize(560, 620)
         self._build_ui()
+        configure_responsive_dialog(self, 640, 680, minimum_height=480)
         self._load_profile()
 
     def _build_ui(self) -> None:
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(26, 24, 26, 22)
+        root = QVBoxLayout(self)
+        root.setContentsMargins(0, 0, 0, 18)
+        root.setSpacing(10)
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        content = QWidget()
+        content.setObjectName("dialogScrollContent")
+        layout = QVBoxLayout(content)
+        layout.setContentsMargins(26, 24, 26, 14)
         layout.setSpacing(16)
 
         header = QHBoxLayout()
@@ -162,6 +172,9 @@ class TeacherProfileDialog(QDialog):
         privacy_hint.setObjectName("privacyHint")
         layout.addWidget(privacy_hint)
 
+        scroll.setWidget(content)
+        root.addWidget(scroll, 1)
+
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel
         )
@@ -171,7 +184,11 @@ class TeacherProfileDialog(QDialog):
         )
         buttons.accepted.connect(self._save)
         buttons.rejected.connect(self.reject)
-        layout.addWidget(buttons)
+        footer = QWidget()
+        footer_layout = QHBoxLayout(footer)
+        footer_layout.setContentsMargins(26, 0, 26, 0)
+        footer_layout.addWidget(buttons)
+        root.addWidget(footer)
 
         self.name_input.textChanged.connect(self._refresh_preview)
         self.mark_input.textChanged.connect(self._refresh_preview)

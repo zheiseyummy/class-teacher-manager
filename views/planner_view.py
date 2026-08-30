@@ -11,20 +11,24 @@ from PySide6.QtWidgets import (
     QCalendarWidget,
     QComboBox,
     QFrame,
+    QGridLayout,
     QHBoxLayout,
     QLabel,
     QMessageBox,
+    QMenu,
     QPushButton,
     QSplitter,
     QTabWidget,
     QTableWidget,
     QTableWidgetItem,
     QVBoxLayout,
+    QToolButton,
     QWidget,
 )
 
 from controllers.planner_controller import PlannerController, PlannerDataError
-from utils.ui_layout import configure_resizable_table, restore_splitter
+from utils.ui_icons import lucide_icon
+from utils.ui_layout import configure_resizable_table, restore_splitter, set_compact_columns
 from views.calendar_event_dialog import CalendarEventDialog
 from views.teaching_schedule_view import TeachingScheduleView
 
@@ -39,6 +43,7 @@ class CourseCalendarView(QWidget):
         self.controller = PlannerController()
         self._calendar_classes: list[dict[str, Any]] = []
         self._marked_dates: list[QDate] = []
+        self._compact_mode = False
         self._build_ui()
         self.refresh_all()
 
@@ -63,32 +68,50 @@ class CourseCalendarView(QWidget):
 
         toolbar = QFrame()
         toolbar.setObjectName("plannerToolbar")
-        toolbar_layout = QHBoxLayout(toolbar)
-        toolbar_layout.setContentsMargins(16, 12, 16, 12)
-        toolbar_layout.setSpacing(10)
+        self.calendar_toolbar_layout = QGridLayout(toolbar)
+        self.calendar_toolbar_layout.setContentsMargins(12, 10, 12, 10)
+        self.calendar_toolbar_layout.setHorizontalSpacing(8)
+        self.calendar_toolbar_layout.setVerticalSpacing(8)
 
-        title = QLabel("班级日历")
-        title.setObjectName("sectionTitle")
-        toolbar_layout.addWidget(title)
+        self.calendar_title = QLabel("日程范围")
+        self.calendar_title.setObjectName("toolbarContext")
+        self.calendar_toolbar_layout.addWidget(self.calendar_title, 0, 0)
 
         self.calendar_class_box = QComboBox()
         self.calendar_class_box.setMinimumWidth(180)
         self.calendar_class_box.currentIndexChanged.connect(self._refresh_calendar)
-        toolbar_layout.addWidget(self.calendar_class_box)
-        toolbar_layout.addStretch(1)
+        self.calendar_toolbar_layout.addWidget(self.calendar_class_box, 0, 1)
+        self.calendar_toolbar_layout.setColumnStretch(2, 1)
 
-        add_button = QPushButton("新增日程")
-        add_button.setObjectName("primaryButton")
-        add_button.clicked.connect(self._add_event)
-        toolbar_layout.addWidget(add_button)
+        self.add_event_button = QPushButton("新增日程")
+        self.add_event_button.setObjectName("primaryButton")
+        self.add_event_button.setIcon(
+            lucide_icon("calendar-plus", color="#FFFFFF", active_color="#FFFFFF")
+        )
+        self.add_event_button.clicked.connect(self._add_event)
+        self.calendar_toolbar_layout.addWidget(self.add_event_button, 0, 3)
 
-        edit_button = QPushButton("编辑所选日程")
-        edit_button.clicked.connect(self._edit_selected_event)
-        toolbar_layout.addWidget(edit_button)
+        self.edit_event_button = QPushButton("编辑所选日程")
+        self.edit_event_button.clicked.connect(self._edit_selected_event)
+        self.calendar_toolbar_layout.addWidget(self.edit_event_button, 0, 4)
 
-        delete_button = QPushButton("删除所选日程")
-        delete_button.clicked.connect(self._delete_selected_event)
-        toolbar_layout.addWidget(delete_button)
+        self.delete_event_button = QPushButton("删除所选日程")
+        self.delete_event_button.setObjectName("dangerButton")
+        self.delete_event_button.clicked.connect(self._delete_selected_event)
+        self.calendar_toolbar_layout.addWidget(self.delete_event_button, 0, 5)
+
+        self.calendar_more_button = QToolButton()
+        self.calendar_more_button.setObjectName("moreButton")
+        self.calendar_more_button.setText("更多")
+        self.calendar_more_button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+        self.calendar_more_button.setIcon(lucide_icon("clipboard-check"))
+        self.calendar_more_button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        more_menu = QMenu(self.calendar_more_button)
+        more_menu.addAction("编辑所选日程", self._edit_selected_event)
+        more_menu.addAction("删除所选日程", self._delete_selected_event)
+        self.calendar_more_button.setMenu(more_menu)
+        self.calendar_more_button.setVisible(False)
+        self.calendar_toolbar_layout.addWidget(self.calendar_more_button, 0, 6)
         layout.addWidget(toolbar)
 
         self.calendar_splitter = QSplitter(Qt.Orientation.Horizontal)
@@ -275,3 +298,42 @@ class CourseCalendarView(QWidget):
         item = self.event_table.item(row, 0)
         value = item.data(Qt.ItemDataRole.UserRole) if item is not None else None
         return int(value) if value is not None else None
+
+    def set_compact_mode(self, compact: bool) -> None:
+        if compact == self._compact_mode:
+            return
+        self._compact_mode = compact
+        self.schedule_view.set_compact_mode(compact)
+        self.calendar_title.setVisible(not compact)
+        self.edit_event_button.setVisible(not compact)
+        self.delete_event_button.setVisible(not compact)
+        self.calendar_more_button.setVisible(compact)
+
+        toolbar_widgets = (
+            self.calendar_class_box,
+            self.add_event_button,
+            self.edit_event_button,
+            self.delete_event_button,
+            self.calendar_more_button,
+        )
+        for widget in toolbar_widgets:
+            self.calendar_toolbar_layout.removeWidget(widget)
+        if compact:
+            self.calendar_class_box.setMinimumWidth(0)
+            self.calendar_toolbar_layout.addWidget(self.calendar_class_box, 0, 0, 1, 2)
+            self.calendar_toolbar_layout.addWidget(self.add_event_button, 1, 0)
+            self.calendar_toolbar_layout.addWidget(self.calendar_more_button, 1, 1)
+            self.calendar_toolbar_layout.setColumnStretch(0, 1)
+        else:
+            self.calendar_class_box.setMinimumWidth(180)
+            self.calendar_toolbar_layout.addWidget(self.calendar_class_box, 0, 1)
+            self.calendar_toolbar_layout.addWidget(self.add_event_button, 0, 3)
+            self.calendar_toolbar_layout.addWidget(self.edit_event_button, 0, 4)
+            self.calendar_toolbar_layout.addWidget(self.delete_event_button, 0, 5)
+            self.calendar_toolbar_layout.setColumnStretch(2, 1)
+
+        self.calendar_splitter.setOrientation(
+            Qt.Orientation.Vertical if compact else Qt.Orientation.Horizontal
+        )
+        set_compact_columns(self.event_table, (2, 3, 4), compact)
+        self.calendar_splitter.setSizes([320, 340] if compact else [360, 780])

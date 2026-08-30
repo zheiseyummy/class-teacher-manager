@@ -14,15 +14,15 @@ from PySide6.QtWidgets import (
 
 from controllers.quality_controller import QualityImportResult
 from utils.quality_scoring import RULE_BY_KEY
-from utils.ui_layout import configure_resizable_table
+from utils.ui_layout import configure_resizable_table, configure_responsive_dialog
 
 
 class QualityImportResultDialog(QDialog):
     def __init__(self, result: QualityImportResult, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setWindowTitle("综合素质 Excel 导入结果")
-        self.setMinimumSize(720, 420)
         self._build_ui(result)
+        configure_responsive_dialog(self, 720, 420, minimum_height=340)
 
     def _build_ui(self, result: QualityImportResult) -> None:
         layout = QVBoxLayout(self)

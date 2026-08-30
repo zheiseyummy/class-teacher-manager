@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (
     QDialog,
     QFileDialog,
     QFrame,
+    QGridLayout,
     QHBoxLayout,
     QLabel,
     QLineEdit,
@@ -23,6 +24,7 @@ from PySide6.QtWidgets import (
     QPushButton,
     QSplitter,
     QStackedWidget,
+    QToolButton,
     QVBoxLayout,
     QWidget,
 )
@@ -33,7 +35,7 @@ from controllers.teacher_profile_controller import TeacherProfileController
 from utils.backup_scheduler import BackupScheduler
 from utils.excel_service import ensure_student_import_template
 from utils.ui_icons import lucide_icon
-from utils.ui_layout import restore_splitter
+from utils.ui_layout import refresh_style, restore_splitter
 from views.attendance_view import AttendanceView
 from views.backup_view import BackupView
 from views.import_result_dialog import ImportResultDialog
@@ -99,11 +101,23 @@ class MainWindow(QMainWindow):
         ("数据备份与恢复", "本地数据归档与恢复"),
     )
 
+    NAVIGATION_ITEMS = (
+        ("今日班级工作台", "layout-dashboard"),
+        ("学生数据中心", "users-round"),
+        ("综合素质评价", "shield-check"),
+        ("成绩管理", "chart-no-axes-column-increasing"),
+        ("德育评价", "award"),
+        ("请假与考勤", "calendar-clock"),
+        ("课程表与日历", "calendar-days"),
+        ("数据备份与恢复", "database-backup"),
+    )
+
     def __init__(self) -> None:
         super().__init__()
         self.setWindowTitle(APP_NAME)
         self.resize(1360, 840)
-        self.setMinimumSize(1120, 700)
+        self.setMinimumSize(360, 640)
+        self._compact_mode: bool | None = None
 
         self.menu = QListWidget()
         self.stack = QStackedWidget()
@@ -131,11 +145,11 @@ class MainWindow(QMainWindow):
         self.root_splitter.setObjectName("mainSplitter")
         self.root_splitter.setChildrenCollapsible(False)
 
-        sidebar = QFrame()
-        sidebar.setObjectName("sidebar")
-        sidebar.setMinimumWidth(208)
-        sidebar.setMaximumWidth(310)
-        sidebar_layout = QVBoxLayout(sidebar)
+        self.sidebar = QFrame()
+        self.sidebar.setObjectName("sidebar")
+        self.sidebar.setMinimumWidth(208)
+        self.sidebar.setMaximumWidth(280)
+        sidebar_layout = QVBoxLayout(self.sidebar)
         sidebar_layout.setContentsMargins(14, 20, 14, 16)
         sidebar_layout.setSpacing(16)
 
@@ -149,8 +163,8 @@ class MainWindow(QMainWindow):
         brand_mark.setFixedSize(40, 40)
         brand_icon = lucide_icon(
             "graduation-cap",
-            color="#FFFFFF",
-            active_color="#FFFFFF",
+            color="#2F64D6",
+            active_color="#2F64D6",
             size=22,
         )
         brand_mark.setPixmap(brand_icon.pixmap(QSize(22, 22)))
@@ -170,23 +184,13 @@ class MainWindow(QMainWindow):
         self.menu.setFrameShape(QFrame.NoFrame)
         self.menu.setSpacing(2)
         self.menu.setIconSize(QSize(18, 18))
-        navigation_items = (
-            ("今日班级工作台", "layout-dashboard"),
-            ("学生数据中心", "users-round"),
-            ("综合素质评价", "shield-check"),
-            ("成绩管理", "chart-no-axes-column-increasing"),
-            ("德育评价", "award"),
-            ("请假与考勤", "calendar-clock"),
-            ("课程表与日历", "calendar-days"),
-            ("数据备份与恢复", "database-backup"),
-        )
-        for text, icon_name in navigation_items:
+        for text, icon_name in self.NAVIGATION_ITEMS:
             item = QListWidgetItem(
                 lucide_icon(
                     icon_name,
-                    color="#C7DCFF",
-                    active_color="#FFFFFF",
-                    selected_color="#2563EB",
+                    color="#66768B",
+                    active_color="#2F64D6",
+                    selected_color="#2F64D6",
                 ),
                 text,
             )
@@ -220,11 +224,27 @@ class MainWindow(QMainWindow):
 
         self.workbench_view = TodayWorkbenchView()
 
-        shell_header = QFrame()
-        shell_header.setObjectName("shellHeader")
-        shell_header_layout = QHBoxLayout(shell_header)
-        shell_header_layout.setContentsMargins(24, 16, 24, 16)
-        shell_header_layout.setSpacing(18)
+        self.shell_header = QFrame()
+        self.shell_header.setObjectName("shellHeader")
+        self.shell_header_layout = QHBoxLayout(self.shell_header)
+        self.shell_header_layout.setContentsMargins(24, 16, 24, 16)
+        self.shell_header_layout.setSpacing(14)
+
+        self.compact_nav_button = QToolButton()
+        self.compact_nav_button.setObjectName("compactNavButton")
+        self.compact_nav_button.setIcon(lucide_icon("layout-dashboard", size=19))
+        self.compact_nav_button.setIconSize(QSize(19, 19))
+        self.compact_nav_button.setToolTip("切换功能模块")
+        self.compact_nav_button.setAccessibleName("切换功能模块")
+        self.compact_nav_button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        compact_nav_menu = QMenu(self.compact_nav_button)
+        for index, (text, icon_name) in enumerate(self.NAVIGATION_ITEMS):
+            action = compact_nav_menu.addAction(lucide_icon(icon_name), text)
+            action.triggered.connect(lambda _checked=False, row=index: self.menu.setCurrentRow(row))
+        self.compact_nav_button.setMenu(compact_nav_menu)
+        self.compact_nav_button.setVisible(False)
+        self.shell_header_layout.addWidget(self.compact_nav_button)
+
         title_layout = QVBoxLayout()
         title_layout.setSpacing(2)
         self.page_title = ClickableLabel()
@@ -233,38 +253,40 @@ class MainWindow(QMainWindow):
         self.page_subtitle = QLabel()
         self.page_subtitle.setObjectName("pageSubtitle")
         title_layout.addWidget(self.page_subtitle)
-        shell_header_layout.addLayout(title_layout, 1)
-        shell_header_layout.addWidget(self.workbench_view.header_controls)
+        self.shell_header_layout.addLayout(title_layout, 1)
+        self.shell_header_layout.addWidget(self.workbench_view.header_controls)
         self.header_date = QLabel(self._format_date(date.today()))
         self.header_date.setObjectName("headerDate")
-        shell_header_layout.addWidget(self.header_date)
-        content_layout.addWidget(shell_header)
+        self.shell_header_layout.addWidget(self.header_date)
+        content_layout.addWidget(self.shell_header)
 
-        page_area = QFrame()
-        page_area.setObjectName("pageArea")
-        page_layout = QVBoxLayout(page_area)
-        page_layout.setContentsMargins(22, 18, 22, 22)
-        page_layout.setSpacing(14)
+        self.page_area = QFrame()
+        self.page_area.setObjectName("pageArea")
+        self.page_layout = QVBoxLayout(self.page_area)
+        self.page_layout.setContentsMargins(22, 18, 22, 22)
+        self.page_layout.setSpacing(14)
 
         self.top_bar = QFrame()
         self.top_bar.setObjectName("topBar")
-        top_layout = QHBoxLayout(self.top_bar)
-        top_layout.setContentsMargins(14, 10, 14, 10)
-        top_layout.setSpacing(10)
+        self.top_layout = QGridLayout(self.top_bar)
+        self.top_layout.setContentsMargins(14, 10, 14, 10)
+        self.top_layout.setHorizontalSpacing(10)
+        self.top_layout.setVerticalSpacing(8)
 
         self.search_input.setPlaceholderText("搜索姓名、学号或家长电话")
         self.search_input.setObjectName("searchInput")
         self.search_input.setMinimumWidth(250)
-        top_layout.addWidget(self.search_input, 1)
+        self.top_layout.addWidget(self.search_input, 0, 0)
+        self.top_layout.setColumnStretch(0, 1)
 
         self.class_filter.setObjectName("classFilter")
         self.class_filter.setMinimumWidth(142)
-        top_layout.addWidget(self.class_filter)
+        self.top_layout.addWidget(self.class_filter, 0, 1)
 
         self.manage_class_button = QPushButton("管理班级")
         self.manage_class_button.setObjectName("secondaryButton")
         self.manage_class_button.setIcon(lucide_icon("users-round"))
-        top_layout.addWidget(self.manage_class_button)
+        self.top_layout.addWidget(self.manage_class_button, 0, 2)
 
         self.import_button = QPushButton("导入 Excel")
         self.import_button.setObjectName("secondaryButton")
@@ -273,7 +295,7 @@ class MainWindow(QMainWindow):
         import_menu.addAction("选择 Excel 文件", self._import_excel)
         import_menu.addAction("打开导入模板", self._open_import_template)
         self.import_button.setMenu(import_menu)
-        top_layout.addWidget(self.import_button)
+        self.top_layout.addWidget(self.import_button, 0, 3)
 
         self.export_button = QPushButton("导出 Excel")
         self.export_button.setObjectName("secondaryButton")
@@ -283,7 +305,7 @@ class MainWindow(QMainWindow):
         export_menu.addAction("导出当前班级学生信息", self._export_current_class)
         export_menu.addAction("导出家长通讯录", self._export_guardian_directory)
         self.export_button.setMenu(export_menu)
-        top_layout.addWidget(self.export_button)
+        self.top_layout.addWidget(self.export_button, 0, 4)
 
         self.add_student_button = QPushButton("新增学生")
         self.add_student_button.setObjectName("primaryButton")
@@ -294,15 +316,40 @@ class MainWindow(QMainWindow):
                 active_color="#FFFFFF",
             )
         )
-        top_layout.addWidget(self.add_student_button)
+        self.top_layout.addWidget(self.add_student_button, 0, 5)
 
-        page_layout.addWidget(self.top_bar)
+        self.student_more_button = QToolButton()
+        self.student_more_button.setObjectName("moreButton")
+        self.student_more_button.setText("更多")
+        self.student_more_button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+        self.student_more_button.setIcon(lucide_icon("clipboard-check"))
+        self.student_more_button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        student_more_menu = QMenu(self.student_more_button)
+        student_more_menu.addAction(
+            lucide_icon("users-round"),
+            "管理班级",
+            lambda: self.manage_class_button.click(),
+        )
+        import_more_menu = student_more_menu.addMenu(lucide_icon("file-up"), "导入")
+        import_more_menu.addAction("选择 Excel 文件", self._import_excel)
+        import_more_menu.addAction("打开导入模板", self._open_import_template)
+        export_more_menu = student_more_menu.addMenu(lucide_icon("file-down"), "导出")
+        export_more_menu.addAction("全部学生信息", self._export_all_students)
+        export_more_menu.addAction("当前班级学生信息", self._export_current_class)
+        export_more_menu.addAction("家长通讯录", self._export_guardian_directory)
+        self.student_more_button.setMenu(student_more_menu)
+        self.student_more_button.setVisible(False)
+        self.top_layout.addWidget(self.student_more_button, 0, 6)
+
+        self.page_layout.addWidget(self.top_bar)
 
         self.stack.addWidget(self.workbench_view)
         self.students_view = StudentsView()
         self.stack.addWidget(self.students_view)
-        self.stack.addWidget(QualityView())
-        self.stack.addWidget(ScoresView())
+        self.quality_view = QualityView()
+        self.stack.addWidget(self.quality_view)
+        self.scores_view = ScoresView()
+        self.stack.addWidget(self.scores_view)
         self.moral_view = MoralView()
         self.stack.addWidget(self.moral_view)
         self.attendance_view = AttendanceView()
@@ -311,10 +358,10 @@ class MainWindow(QMainWindow):
         self.stack.addWidget(self.planner_view)
         self.backup_view = BackupView()
         self.stack.addWidget(self.backup_view)
-        page_layout.addWidget(self.stack, 1)
-        content_layout.addWidget(page_area, 1)
+        self.page_layout.addWidget(self.stack, 1)
+        content_layout.addWidget(self.page_area, 1)
 
-        self.root_splitter.addWidget(sidebar)
+        self.root_splitter.addWidget(self.sidebar)
         self.root_splitter.addWidget(content)
         self.root_splitter.setStretchFactor(0, 0)
         self.root_splitter.setStretchFactor(1, 1)
@@ -322,6 +369,7 @@ class MainWindow(QMainWindow):
         root_layout.addWidget(self.root_splitter)
         self.setCentralWidget(root)
         self._refresh_teacher_profile()
+        self._apply_responsive_layout(force=True)
 
     def _connect_signals(self) -> None:
         self.menu.currentRowChanged.connect(self._change_page)
@@ -331,6 +379,7 @@ class MainWindow(QMainWindow):
         self.add_student_button.clicked.connect(self.students_view.open_add_student)
         self.students_view.classes_changed.connect(self._refresh_class_filter)
         self.students_view.classes_changed.connect(self._refresh_planning_classes)
+        self.students_view.filters_clear_requested.connect(self._clear_student_filters)
         self.planner_view.data_changed.connect(self.workbench_view.refresh_classes)
         self.workbench_view.navigate_requested.connect(self.menu.setCurrentRow)
         self.workbench_view.planner_action_requested.connect(self._open_planner_from_workbench)
@@ -352,7 +401,8 @@ class MainWindow(QMainWindow):
         self.page_title.setToolTip("编辑教师信息" if index == 0 else "")
         self.page_subtitle.setText(subtitle)
         self.workbench_view.header_controls.setVisible(index == 0)
-        self.header_date.setVisible(index != 0)
+        self.header_date.setVisible(index != 0 and not bool(self._compact_mode))
+        self.page_subtitle.setVisible(not bool(self._compact_mode))
         if index == 0:
             self.workbench_view.refresh()
         elif index == 4:
@@ -410,6 +460,10 @@ class MainWindow(QMainWindow):
 
     def _apply_class_filter(self) -> None:
         self.students_view.set_class_filter(self.class_filter.currentData())
+
+    def _clear_student_filters(self) -> None:
+        self.search_input.clear()
+        self.class_filter.setCurrentIndex(0)
 
     def _refresh_class_filter(self) -> None:
         selected_id = self.class_filter.currentData()
@@ -487,6 +541,93 @@ class MainWindow(QMainWindow):
         label.setAlignment(Qt.AlignCenter)
         layout.addWidget(label, 1)
         return page
+
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        if not hasattr(self, "sidebar"):
+            return
+        self._apply_responsive_layout()
+
+    def _apply_responsive_layout(self, *, force: bool = False) -> None:
+        compact = self.width() < 840
+        if not force and compact == self._compact_mode:
+            return
+        self._compact_mode = compact
+        self.setProperty("compact", compact)
+        refresh_style(self)
+
+        self.sidebar.setVisible(not compact)
+        self.compact_nav_button.setVisible(compact)
+        self.header_date.setVisible(not compact and self.menu.currentRow() != 0)
+        self.page_subtitle.setVisible(not compact)
+        self.root_splitter.setHandleWidth(1 if compact else 6)
+        self.shell_header_layout.setContentsMargins(
+            12 if compact else 24,
+            10 if compact else 16,
+            12 if compact else 24,
+            10 if compact else 16,
+        )
+        self.page_layout.setContentsMargins(
+            10 if compact else 22,
+            10 if compact else 18,
+            10 if compact else 22,
+            12 if compact else 22,
+        )
+
+        toolbar_widgets = (
+            self.search_input,
+            self.class_filter,
+            self.manage_class_button,
+            self.import_button,
+            self.export_button,
+            self.add_student_button,
+            self.student_more_button,
+        )
+        for widget in toolbar_widgets:
+            self.top_layout.removeWidget(widget)
+
+        if compact:
+            self.search_input.setMinimumWidth(0)
+            self.class_filter.setMinimumWidth(110)
+            self.manage_class_button.setVisible(False)
+            self.import_button.setVisible(False)
+            self.export_button.setVisible(False)
+            self.student_more_button.setVisible(True)
+            self.top_layout.addWidget(self.search_input, 0, 0, 1, 3)
+            self.top_layout.addWidget(self.class_filter, 1, 0)
+            self.top_layout.addWidget(self.add_student_button, 1, 1)
+            self.top_layout.addWidget(self.student_more_button, 1, 2)
+            self.top_layout.setColumnStretch(0, 1)
+            self.top_layout.setColumnStretch(1, 0)
+            self.top_layout.setColumnStretch(2, 0)
+        else:
+            self.search_input.setMinimumWidth(250)
+            self.class_filter.setMinimumWidth(142)
+            self.manage_class_button.setVisible(True)
+            self.import_button.setVisible(True)
+            self.export_button.setVisible(True)
+            self.student_more_button.setVisible(False)
+            self.top_layout.addWidget(self.search_input, 0, 0)
+            self.top_layout.addWidget(self.class_filter, 0, 1)
+            self.top_layout.addWidget(self.manage_class_button, 0, 2)
+            self.top_layout.addWidget(self.import_button, 0, 3)
+            self.top_layout.addWidget(self.export_button, 0, 4)
+            self.top_layout.addWidget(self.add_student_button, 0, 5)
+            self.top_layout.setColumnStretch(0, 1)
+
+        self.workbench_view.set_compact_mode(compact)
+        for view in (
+            self.students_view,
+            self.quality_view,
+            self.scores_view,
+            self.moral_view,
+            self.attendance_view,
+            self.planner_view,
+            self.backup_view,
+        ):
+            handler = getattr(view, "set_compact_mode", None)
+            if callable(handler):
+                handler(compact)
 
     @staticmethod
     def _format_date(value: date) -> str:

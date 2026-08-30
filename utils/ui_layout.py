@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 
 from PySide6.QtCore import QSettings
-from PySide6.QtWidgets import QAbstractItemView, QHeaderView, QSplitter
+from PySide6.QtWidgets import QAbstractItemView, QDialog, QHeaderView, QSplitter, QWidget
 
 
 def restore_splitter(splitter: QSplitter, key: str, default_sizes: Iterable[int]) -> None:
@@ -25,7 +25,52 @@ def configure_resizable_table(table: QAbstractItemView) -> None:
     header.setMinimumSectionSize(58)
     table.setHorizontalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
     table.setVerticalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
-    table.verticalHeader().setDefaultSectionSize(38)
+    table.verticalHeader().setDefaultSectionSize(44)
+
+
+def set_compact_columns(
+    table: QAbstractItemView,
+    hidden_columns: Iterable[int],
+    compact: bool,
+) -> None:
+    """Hide low-priority columns in narrow layouts while preserving user data."""
+
+    for column in hidden_columns:
+        table.setColumnHidden(column, compact)
+
+
+def refresh_style(widget: QWidget) -> None:
+    """Re-evaluate QSS selectors after a dynamic property changes."""
+
+    widget.style().unpolish(widget)
+    widget.style().polish(widget)
+    widget.update()
+
+
+def configure_responsive_dialog(
+    dialog: QDialog,
+    preferred_width: int,
+    preferred_height: int | None = None,
+    *,
+    minimum_width: int = 340,
+    minimum_height: int = 240,
+) -> None:
+    """Keep data-entry dialogs usable when the desktop window is narrow."""
+
+    parent = dialog.parentWidget()
+    parent_window = parent.window() if parent is not None else None
+    compact = parent_window is not None and parent_window.width() < 840
+
+    target_width = preferred_width
+    target_height = preferred_height or max(dialog.sizeHint().height(), minimum_height)
+    if compact and parent_window is not None:
+        target_width = min(preferred_width, max(320, parent_window.width() - 24))
+        target_height = min(target_height, max(420, parent_window.height() - 32))
+
+    dialog.setMinimumWidth(min(minimum_width, target_width))
+    dialog.setMinimumHeight(min(minimum_height, target_height))
+    dialog.resize(target_width, target_height)
+    dialog.setProperty("compact", compact)
 
 
 def _read_sizes(raw_value) -> list[int] | None:

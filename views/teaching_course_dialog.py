@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (
 )
 
 from controllers.teaching_schedule_controller import TeachingScheduleController, TeachingScheduleDataError
+from utils.ui_layout import configure_responsive_dialog
 
 
 class TeachingCourseDialog(QDialog):
@@ -33,8 +34,8 @@ class TeachingCourseDialog(QDialog):
         self.course_id = course_id
         self.saved_course_id: int | None = None
         self.setWindowTitle("编辑课程" if course_id is not None else "新增课程")
-        self.setMinimumWidth(470)
         self._build_ui()
+        configure_responsive_dialog(self, 470)
         if course_id is not None:
             self._load_course(course_id)
         else:

@@ -16,6 +16,7 @@ from PySide6.QtWidgets import (
 )
 
 from controllers.attendance_controller import AttendanceController, AttendanceDataError
+from utils.ui_layout import configure_responsive_dialog
 
 
 class AttendanceRecordDialog(QDialog):
@@ -32,8 +33,8 @@ class AttendanceRecordDialog(QDialog):
         self.record_id = record_id
         self.saved_record_id: int | None = None
         self.setWindowTitle("编辑记录" if record_id is not None else "新增请假与考勤记录")
-        self.setMinimumWidth(480)
         self._build_ui()
+        configure_responsive_dialog(self, 480)
         if record_id is not None:
             self._load_record(record_id)
 

@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
 )
 
 from controllers.teaching_schedule_controller import TeachingScheduleController, TeachingScheduleDataError
+from utils.ui_layout import configure_responsive_dialog
 
 
 class SemesterDialog(QDialog):
@@ -31,8 +32,8 @@ class SemesterDialog(QDialog):
         self.semester_id = semester_id
         self.saved_semester_id: int | None = None
         self.setWindowTitle("编辑学期" if semester_id is not None else "新增学期")
-        self.setMinimumWidth(470)
         self._build_ui()
+        configure_responsive_dialog(self, 470)
         if semester_id is not None:
             self._load_semester(semester_id)
 

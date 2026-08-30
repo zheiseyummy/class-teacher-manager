@@ -16,7 +16,11 @@ from PySide6.QtWidgets import (
 )
 
 from controllers.teaching_schedule_controller import TeachingScheduleController, TeachingScheduleDataError
-from utils.ui_layout import configure_resizable_table, restore_splitter
+from utils.ui_layout import (
+    configure_resizable_table,
+    configure_responsive_dialog,
+    restore_splitter,
+)
 from views.schedule_period_dialog import SchedulePeriodDialog
 from views.semester_dialog import SemesterDialog
 
@@ -29,9 +33,8 @@ class SemesterPeriodManagerDialog(QDialog):
         self.controller = controller
         self.changed = False
         self.setWindowTitle("学期与课时设置")
-        self.resize(860, 680)
-        self.setMinimumSize(720, 540)
         self._build_ui()
+        configure_responsive_dialog(self, 860, 680, minimum_height=480)
         self.refresh()
 
     def _build_ui(self) -> None:
@@ -71,6 +74,7 @@ class SemesterPeriodManagerDialog(QDialog):
         edit_button.clicked.connect(self._edit_semester)
         header.addWidget(edit_button)
         delete_button = QPushButton("删除")
+        delete_button.setObjectName("dangerButton")
         delete_button.clicked.connect(self._delete_semester)
         header.addWidget(delete_button)
         layout.addLayout(header)
@@ -112,6 +116,7 @@ class SemesterPeriodManagerDialog(QDialog):
         self.edit_period_button.clicked.connect(self._edit_period)
         header.addWidget(self.edit_period_button)
         self.delete_period_button = QPushButton("删除")
+        self.delete_period_button.setObjectName("dangerButton")
         self.delete_period_button.clicked.connect(self._delete_period)
         header.addWidget(self.delete_period_button)
         layout.addLayout(header)

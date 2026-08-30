@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
     QListWidget,
     QListWidgetItem,
     QPushButton,
+    QScrollArea,
     QSizePolicy,
     QSplitter,
     QVBoxLayout,
@@ -94,6 +95,7 @@ class TodayWorkbenchView(QWidget):
         self.score_controller = ScoreController()
         self._reference_date: date | None = None
         self._classes: list[dict[str, Any]] = []
+        self._compact_mode = False
         self._build_header_controls()
         self._build_ui()
         self.refresh_classes()
@@ -142,15 +144,26 @@ class TodayWorkbenchView(QWidget):
         header_layout.addWidget(self.refresh_button)
 
     def _build_ui(self) -> None:
-        layout = QVBoxLayout(self)
+        root_layout = QVBoxLayout(self)
+        root_layout.setContentsMargins(0, 0, 0, 0)
+        root_layout.setSpacing(0)
+        self.scroll_area = QScrollArea()
+        self.scroll_area.setObjectName("workbenchScroll")
+        self.scroll_area.setFrameShape(QFrame.Shape.NoFrame)
+        self.scroll_area.setWidgetResizable(True)
+        self.scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.scroll_content = QWidget()
+        self.scroll_content.setMinimumWidth(0)
+        layout = QVBoxLayout(self.scroll_content)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(12)
 
-        metric_grid = QGridLayout()
-        metric_grid.setContentsMargins(0, 0, 0, 0)
-        metric_grid.setHorizontalSpacing(10)
-        metric_grid.setVerticalSpacing(10)
+        self.metric_grid = QGridLayout()
+        self.metric_grid.setContentsMargins(0, 0, 0, 0)
+        self.metric_grid.setHorizontalSpacing(10)
+        self.metric_grid.setVerticalSpacing(10)
         self.metric_cards: dict[str, MetricCard] = {}
+        self.metric_order: list[MetricCard] = []
         metric_definitions = (
             (
                 "student_count",
@@ -190,10 +203,11 @@ class TodayWorkbenchView(QWidget):
         )
         for column, (key, label, icon, tone, color) in enumerate(metric_definitions):
             card = MetricCard(label, icon, tone, color)
-            metric_grid.addWidget(card, 0, column)
-            metric_grid.setColumnStretch(column, 1)
+            self.metric_grid.addWidget(card, 0, column)
+            self.metric_grid.setColumnStretch(column, 1)
             self.metric_cards[key] = card
-        layout.addLayout(metric_grid)
+            self.metric_order.append(card)
+        layout.addLayout(self.metric_grid)
 
         self.body_splitter = QSplitter(Qt.Orientation.Horizontal)
         self.body_splitter.setObjectName("workbenchBodySplitter")
@@ -221,6 +235,37 @@ class TodayWorkbenchView(QWidget):
         self.body_splitter.setStretchFactor(1, 1)
         restore_splitter(self.body_splitter, "workbench_columns_v2", [560, 560])
         layout.addWidget(self.body_splitter, 1)
+        self.scroll_area.setWidget(self.scroll_content)
+        root_layout.addWidget(self.scroll_area, 1)
+
+    def set_compact_mode(self, compact: bool) -> None:
+        if compact == self._compact_mode:
+            return
+        self._compact_mode = compact
+        self.date_display.setVisible(not compact)
+        self.refresh_button.setVisible(not compact)
+        self.class_box.setMinimumWidth(110 if compact else 168)
+        self.class_box.setMaximumWidth(132 if compact else 16777215)
+
+        for card in self.metric_order:
+            self.metric_grid.removeWidget(card)
+        columns = 2 if compact else 5
+        for index, card in enumerate(self.metric_order):
+            row, column = divmod(index, columns)
+            if compact and index == len(self.metric_order) - 1:
+                self.metric_grid.addWidget(card, row, 0, 1, 2)
+            else:
+                self.metric_grid.addWidget(card, row, column)
+            card.setMinimumHeight(86 if compact else 92)
+            card.setMaximumHeight(92 if compact else 98)
+        for column in range(5):
+            self.metric_grid.setColumnStretch(column, 1 if column < columns else 0)
+
+        self.body_splitter.setOrientation(
+            Qt.Orientation.Vertical if compact else Qt.Orientation.Horizontal
+        )
+        self.body_splitter.setMinimumHeight(720 if compact else 0)
+        self.body_splitter.setSizes([360, 360] if compact else [560, 560])
 
     def _build_course_panel(self) -> QWidget:
         panel, layout, header = self._panel("今日课程")

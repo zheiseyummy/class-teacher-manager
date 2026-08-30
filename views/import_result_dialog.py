@@ -13,15 +13,15 @@ from PySide6.QtWidgets import (
 )
 
 from controllers.student_controller import StudentImportResult
-from utils.ui_layout import configure_resizable_table
+from utils.ui_layout import configure_resizable_table, configure_responsive_dialog
 
 
 class ImportResultDialog(QDialog):
     def __init__(self, result: StudentImportResult, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setWindowTitle("Excel 导入结果")
-        self.resize(760, 500)
         self._build_ui(result)
+        configure_responsive_dialog(self, 760, 500, minimum_height=360)
 
     def _build_ui(self, result: StudentImportResult) -> None:
         layout = QVBoxLayout(self)

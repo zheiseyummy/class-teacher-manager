@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
 )
 
 from controllers.teaching_schedule_controller import TeachingScheduleController, TeachingScheduleDataError
+from utils.ui_layout import configure_responsive_dialog
 
 
 class SchedulePeriodDialog(QDialog):
@@ -33,8 +34,8 @@ class SchedulePeriodDialog(QDialog):
         self.period_id = period_id
         self.saved_period_id: int | None = None
         self.setWindowTitle("编辑课时" if period_id is not None else "新增课时")
-        self.setMinimumWidth(440)
         self._build_ui()
+        configure_responsive_dialog(self, 440)
         if period_id is not None:
             self._load_period(period_id)
 

@@ -12,25 +12,36 @@ from PySide6.QtWidgets import (
     QFileDialog,
     QFormLayout,
     QFrame,
+    QGridLayout,
     QHBoxLayout,
     QLabel,
     QLineEdit,
     QMessageBox,
+    QMenu,
     QPushButton,
     QSplitter,
+    QStackedWidget,
     QTableView,
     QTableWidget,
     QTableWidgetItem,
     QTabWidget,
+    QToolButton,
     QVBoxLayout,
     QWidget,
 )
 
 from controllers.quality_controller import QualityController, QualityDataError
 from utils.quality_scoring import ENTRY_LEVELS, RULE_BY_KEY, SEMESTER_RULES, formatted_score
-from utils.ui_layout import configure_resizable_table, restore_splitter
+from utils.ui_icons import lucide_icon
+from utils.ui_layout import (
+    configure_resizable_table,
+    configure_responsive_dialog,
+    restore_splitter,
+    set_compact_columns,
+)
 from views.quality_final_review_dialog import QualityFinalReviewDialog
 from views.quality_import_result_dialog import QualityImportResultDialog
+from views.ui_components import EmptyState, scrollable_detail
 
 
 class QualityDimensionDialog(QDialog):
@@ -38,8 +49,8 @@ class QualityDimensionDialog(QDialog):
         super().__init__(parent)
         self.controller = controller
         self.setWindowTitle("评价维度")
-        self.setMinimumWidth(440)
         self._build_ui()
+        configure_responsive_dialog(self, 480, 430, minimum_height=340)
 
     def _build_ui(self) -> None:
         layout = QVBoxLayout(self)
@@ -121,6 +132,8 @@ class QualityView(QWidget):
         self.model = QualityTableModel()
         self.current_student_id: int | None = None
         self.current_dimensions: list[str] = []
+        self._compact_mode = False
+        self._empty_action_mode = ""
         self._build_ui()
         self._refresh_class_filter()
         self.reload()
@@ -130,38 +143,58 @@ class QualityView(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(12)
 
-        toolbar = QHBoxLayout()
-        title = QLabel("综合素质评价")
-        title.setObjectName("sectionTitle")
-        toolbar.addWidget(title)
-        toolbar.addStretch(1)
+        toolbar_frame = QFrame()
+        toolbar_frame.setObjectName("moduleToolbar")
+        self.toolbar_layout = QGridLayout(toolbar_frame)
+        self.toolbar_layout.setContentsMargins(12, 8, 12, 8)
+        self.toolbar_layout.setHorizontalSpacing(8)
+        self.toolbar_layout.setVerticalSpacing(8)
         self.search_input = QLineEdit()
         self.search_input.setObjectName("searchInput")
         self.search_input.setPlaceholderText("搜索姓名或学号...")
         self.search_input.setMinimumWidth(220)
         self.search_input.textChanged.connect(self.reload)
-        toolbar.addWidget(self.search_input)
+        self.toolbar_layout.addWidget(self.search_input, 0, 0)
+        self.toolbar_layout.setColumnStretch(0, 1)
         self.class_filter = QComboBox()
         self.class_filter.setObjectName("classFilter")
         self.class_filter.setMinimumWidth(140)
         self.class_filter.currentIndexChanged.connect(self.reload)
-        toolbar.addWidget(self.class_filter)
-        dimension_button = QPushButton("评价维度")
-        dimension_button.clicked.connect(self._open_dimension_settings)
-        toolbar.addWidget(dimension_button)
-        final_button = QPushButton("最终评定")
-        final_button.setObjectName("primaryButton")
-        final_button.clicked.connect(self._open_final_review)
-        toolbar.addWidget(final_button)
-        import_button = QPushButton("导入 Excel")
-        import_button.setObjectName("secondaryButton")
-        import_button.clicked.connect(self._import_quality)
-        toolbar.addWidget(import_button)
-        export_button = QPushButton("导出 Excel")
-        export_button.setObjectName("secondaryButton")
-        export_button.clicked.connect(self._export_quality)
-        toolbar.addWidget(export_button)
-        layout.addLayout(toolbar)
+        self.toolbar_layout.addWidget(self.class_filter, 0, 1)
+        self.import_button = QPushButton("导入 Excel")
+        self.import_button.setIcon(lucide_icon("file-up"))
+        self.import_button.clicked.connect(self._import_quality)
+        self.toolbar_layout.addWidget(self.import_button, 0, 2)
+        self.export_button = QPushButton("导出 Excel")
+        self.export_button.setIcon(lucide_icon("file-down"))
+        self.export_button.clicked.connect(self._export_quality)
+        self.toolbar_layout.addWidget(self.export_button, 0, 3)
+        self.dimension_button = QPushButton("评价维度")
+        self.dimension_button.clicked.connect(self._open_dimension_settings)
+        self.toolbar_layout.addWidget(self.dimension_button, 0, 4)
+        self.final_button = QPushButton("最终评定")
+        self.final_button.setObjectName("primaryButton")
+        self.final_button.setIcon(
+            lucide_icon("shield-check", color="#FFFFFF", active_color="#FFFFFF")
+        )
+        self.final_button.clicked.connect(self._open_final_review)
+        self.toolbar_layout.addWidget(self.final_button, 0, 5)
+
+        self.more_button = QToolButton()
+        self.more_button.setObjectName("moreButton")
+        self.more_button.setText("更多")
+        self.more_button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+        self.more_button.setIcon(lucide_icon("clipboard-check"))
+        self.more_button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        more_menu = QMenu(self.more_button)
+        more_menu.addAction(lucide_icon("file-up"), "导入 Excel", self._import_quality)
+        more_menu.addAction(lucide_icon("file-down"), "导出 Excel", self._export_quality)
+        more_menu.addSeparator()
+        more_menu.addAction("管理评价维度", self._open_dimension_settings)
+        self.more_button.setMenu(more_menu)
+        self.more_button.setVisible(False)
+        self.toolbar_layout.addWidget(self.more_button, 0, 6)
+        layout.addWidget(toolbar_frame)
 
         self.count_label = QLabel("学生 0 人")
         self.count_label.setObjectName("summaryText")
@@ -190,13 +223,22 @@ class QualityView(QWidget):
         self.table.setColumnWidth(3, 94)
         self.table.setColumnWidth(4, 96)
         self.table.clicked.connect(self._select_student)
-        table_layout.addWidget(self.table)
+        self.table_stack = QStackedWidget()
+        self.table_stack.setObjectName("dataStateStack")
+        self.table_stack.addWidget(self.table)
+        self.empty_state = EmptyState(
+            icon_name="shield-check",
+            action=self._handle_empty_action,
+        )
+        self.table_stack.addWidget(self.empty_state)
+        table_layout.addWidget(self.table_stack)
         self.main_splitter.addWidget(table_frame)
 
         self.editor = QFrame()
         self.editor.setObjectName("qualityPane")
         self._build_editor()
-        self.main_splitter.addWidget(self.editor)
+        self.editor_scroll = scrollable_detail(self.editor, name="qualityEditorScroll")
+        self.main_splitter.addWidget(self.editor_scroll)
         self.main_splitter.setStretchFactor(0, 3)
         self.main_splitter.setStretchFactor(1, 2)
         restore_splitter(self.main_splitter, "quality_main", [720, 440])
@@ -235,6 +277,7 @@ class QualityView(QWidget):
         self.save_button = QPushButton("保存本学期评价")
         self.save_button.setObjectName("primaryButton")
         self.save_button.clicked.connect(self._save_evaluation)
+        self.save_button.setToolTip("请先从学生列表选择一名学生")
         layout.addWidget(self.save_button)
 
         score_title = QLabel("换算进度")
@@ -291,6 +334,24 @@ class QualityView(QWidget):
         self.model.set_rows(rows)
         self.count_label.setText(f"学生 {len(rows)} 人")
         self._clear_editor()
+        if rows:
+            self.table_stack.setCurrentWidget(self.table)
+        else:
+            self.table_stack.setCurrentWidget(self.empty_state)
+            if self.search_input.text().strip() or class_id is not None:
+                self._empty_action_mode = "filters"
+                self.empty_state.set_content(
+                    "没有匹配的评价名单",
+                    "请检查姓名、学号或当前班级筛选条件。",
+                    "清除筛选",
+                )
+            else:
+                self._empty_action_mode = "import"
+                self.empty_state.set_content(
+                    "还没有综合素质评价名单",
+                    "可以独立导入教育局评价表，系统会按学号和姓名建立或匹配学生。",
+                    "导入 Excel",
+                )
 
     def _select_student(self, index: QModelIndex) -> None:
         student_id = self.model.student_id_at(index.row())
@@ -314,6 +375,7 @@ class QualityView(QWidget):
         self._update_term_score()
         self._update_summary(data)
         self.save_button.setEnabled(True)
+        self.save_button.setToolTip("保存当前学生所选学期的五维评价")
 
     def _set_dimension_inputs(self, dimensions: list[str], ratings: dict[str, str]) -> None:
         while self.dimension_form.count():
@@ -442,6 +504,13 @@ class QualityView(QWidget):
                 self._select_student(index)
                 return
 
+    def _handle_empty_action(self) -> None:
+        if self._empty_action_mode == "filters":
+            self.search_input.clear()
+            self.class_filter.setCurrentIndex(0)
+        elif self._empty_action_mode == "import":
+            self._import_quality()
+
     def _clear_editor(self) -> None:
         self.current_student_id = None
         self.current_dimensions = []
@@ -453,8 +522,57 @@ class QualityView(QWidget):
         self.semester_table.setRowCount(0)
         self.dimension_table.setRowCount(0)
         self.save_button.setEnabled(False)
+        self.save_button.setToolTip("请先从学生列表选择一名学生")
         while self.dimension_form.count():
             item = self.dimension_form.takeAt(0)
             if item.widget() is not None:
                 item.widget().deleteLater()
         self.level_boxes = {}
+
+    def set_compact_mode(self, compact: bool) -> None:
+        if compact == self._compact_mode:
+            return
+        self._compact_mode = compact
+        toolbar_widgets = (
+            self.search_input,
+            self.class_filter,
+            self.import_button,
+            self.export_button,
+            self.dimension_button,
+            self.final_button,
+            self.more_button,
+        )
+        for widget in toolbar_widgets:
+            self.toolbar_layout.removeWidget(widget)
+        if compact:
+            self.search_input.setMinimumWidth(0)
+            self.class_filter.setMinimumWidth(110)
+            self.import_button.setVisible(False)
+            self.export_button.setVisible(False)
+            self.dimension_button.setVisible(False)
+            self.more_button.setVisible(True)
+            self.toolbar_layout.addWidget(self.search_input, 0, 0, 1, 3)
+            self.toolbar_layout.addWidget(self.class_filter, 1, 0)
+            self.toolbar_layout.addWidget(self.final_button, 1, 1)
+            self.toolbar_layout.addWidget(self.more_button, 1, 2)
+            self.toolbar_layout.setColumnStretch(0, 1)
+        else:
+            self.search_input.setMinimumWidth(220)
+            self.class_filter.setMinimumWidth(140)
+            self.import_button.setVisible(True)
+            self.export_button.setVisible(True)
+            self.dimension_button.setVisible(True)
+            self.more_button.setVisible(False)
+            self.toolbar_layout.addWidget(self.search_input, 0, 0)
+            self.toolbar_layout.addWidget(self.class_filter, 0, 1)
+            self.toolbar_layout.addWidget(self.import_button, 0, 2)
+            self.toolbar_layout.addWidget(self.export_button, 0, 3)
+            self.toolbar_layout.addWidget(self.dimension_button, 0, 4)
+            self.toolbar_layout.addWidget(self.final_button, 0, 5)
+            self.toolbar_layout.setColumnStretch(0, 1)
+
+        self.main_splitter.setOrientation(
+            Qt.Orientation.Vertical if compact else Qt.Orientation.Horizontal
+        )
+        set_compact_columns(self.table, (2, 4, 5), compact)
+        self.main_splitter.setSizes([300, 430] if compact else [720, 440])

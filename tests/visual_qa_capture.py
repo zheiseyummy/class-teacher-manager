@@ -18,23 +18,30 @@ def run() -> None:
         config.DATABASE_PATH = config.DATA_DIR / "class_manager.db"
         config.DATABASE_URL = f"sqlite:///{config.DATABASE_PATH.as_posix()}"
 
-        from PySide6.QtCore import QDate
+        from PySide6.QtCore import QDate, Qt
         from PySide6.QtWidgets import QApplication, QLabel
 
         from controllers.attendance_controller import AttendanceController
         from controllers.backup_controller import BackupController
         from controllers.moral_controller import MoralController
         from controllers.planner_controller import PlannerController
+        from controllers.quality_controller import QualityController
         from controllers.score_controller import ScoreController
         from controllers.student_controller import StudentController
+        from controllers.teacher_profile_controller import TeacherProfileController
         from controllers.teaching_schedule_controller import TeachingScheduleController
         from database.connection import engine
         from database.init_db import initialize_database
         from views.main_window import MainWindow
+        from views.quality_final_review_dialog import QualityFinalReviewDialog
+        from views.student_form_dialog import StudentFormDialog
+        from views.teacher_profile_dialog import TeacherProfileDialog
 
         target_date = date(2026, 7, 16)
         output_dir = Path(__file__).resolve().parents[1] / "docs"
         output_dir.mkdir(exist_ok=True)
+        design_output_dir = Path(__file__).resolve().parents[1] / ".design" / "screenshots"
+        design_output_dir.mkdir(parents=True, exist_ok=True)
         try:
             initialize_database()
             students = StudentController()
@@ -242,6 +249,91 @@ def run() -> None:
             window.menu.setCurrentRow(7)
             app.processEvents()
             assert window.grab().save(str(output_dir / "visual-qa-backup.png"))
+
+            # Product UI delivery captures. All data above is deterministic demo data.
+            window.resize(1440, 900)
+            window.menu.setCurrentRow(0)
+            window.workbench_view.set_reference_date(target_date)
+            window.page_subtitle.setText(f"今天是 {window._format_date(target_date)}")
+            app.processEvents()
+            assert window.width() == 1440 and window.height() == 900
+            assert _save_grab(
+                window,
+                design_output_dir / "after-desktop.png",
+                1440,
+                900,
+                Qt,
+            )
+
+            window.resize(390, 844)
+            app.processEvents()
+            assert window.width() == 390 and window.height() == 844
+            assert _save_grab(
+                window,
+                design_output_dir / "after-mobile.png",
+                390,
+                844,
+                Qt,
+            )
+
+            compact_pages = (
+                (1, "students"),
+                (2, "quality"),
+                (3, "scores"),
+                (5, "attendance"),
+                (6, "planner"),
+                (7, "backup"),
+            )
+            for page_index, name in compact_pages:
+                window.menu.setCurrentRow(page_index)
+                app.processEvents()
+                assert window.width() == 390
+                assert _save_grab(
+                    window,
+                    design_output_dir / f"after-{name}-mobile.png",
+                    390,
+                    844,
+                    Qt,
+                )
+
+            student_dialog = StudentFormDialog(students, parent=window)
+            student_dialog.show()
+            app.processEvents()
+            assert student_dialog.width() <= 390
+            assert _save_grab(
+                student_dialog,
+                design_output_dir / "after-student-form-mobile.png",
+                student_dialog.width(),
+                student_dialog.height(),
+                Qt,
+            )
+            student_dialog.close()
+
+            profile_dialog = TeacherProfileDialog(TeacherProfileController(), parent=window)
+            profile_dialog.show()
+            app.processEvents()
+            assert profile_dialog.width() <= 390
+            assert _save_grab(
+                profile_dialog,
+                design_output_dir / "after-profile-mobile.png",
+                profile_dialog.width(),
+                profile_dialog.height(),
+                Qt,
+            )
+            profile_dialog.close()
+
+            review_dialog = QualityFinalReviewDialog(QualityController(), parent=window)
+            review_dialog.show()
+            app.processEvents()
+            assert review_dialog.width() <= 390
+            assert _save_grab(
+                review_dialog,
+                design_output_dir / "after-quality-review-mobile.png",
+                review_dialog.width(),
+                review_dialog.height(),
+                Qt,
+            )
+            review_dialog.close()
             window.close()
             app.quit()
         finally:
@@ -258,6 +350,20 @@ def _write_score_book(file_path: Path, rows: list[list[object]]) -> None:
         worksheet.append(row)
     workbook.save(file_path)
     workbook.close()
+
+
+def _save_grab(widget, path: Path, width: int, height: int, qt_namespace) -> bool:
+    """Normalize native high-DPI grabs to the requested QA viewport size."""
+
+    pixmap = widget.grab()
+    if pixmap.width() != width or pixmap.height() != height:
+        pixmap = pixmap.scaled(
+            width,
+            height,
+            qt_namespace.AspectRatioMode.IgnoreAspectRatio,
+            qt_namespace.TransformationMode.SmoothTransformation,
+        )
+    return pixmap.save(str(path))
 
 
 if __name__ == "__main__":

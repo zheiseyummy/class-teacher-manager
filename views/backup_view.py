@@ -13,21 +13,27 @@ from PySide6.QtWidgets import (
     QFileDialog,
     QFormLayout,
     QFrame,
+    QGridLayout,
     QHBoxLayout,
     QLabel,
     QLineEdit,
     QMessageBox,
+    QMenu,
     QPushButton,
     QSplitter,
+    QStackedWidget,
     QTableWidget,
     QTableWidgetItem,
     QTimeEdit,
+    QToolButton,
     QVBoxLayout,
     QWidget,
 )
 
 from controllers.backup_controller import BackupController, BackupDataError
-from utils.ui_layout import configure_resizable_table, restore_splitter
+from utils.ui_icons import lucide_icon
+from utils.ui_layout import configure_resizable_table, restore_splitter, set_compact_columns
+from views.ui_components import EmptyState, scrollable_detail
 
 
 class BackupView(QWidget):
@@ -50,6 +56,7 @@ class BackupView(QWidget):
         self.controller = BackupController()
         self._semesters: list[dict[str, Any]] = []
         self._records: list[dict[str, Any]] = []
+        self._compact_mode = False
         self._build_ui()
         self.refresh_all()
 
@@ -58,31 +65,56 @@ class BackupView(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(12)
 
-        toolbar = QHBoxLayout()
+        toolbar_frame = QFrame()
+        toolbar_frame.setObjectName("moduleToolbar")
+        self.toolbar_layout = QGridLayout(toolbar_frame)
+        self.toolbar_layout.setContentsMargins(12, 8, 12, 8)
+        self.toolbar_layout.setHorizontalSpacing(8)
+        self.toolbar_copy = QWidget()
         title_box = QVBoxLayout()
+        self.toolbar_copy.setLayout(title_box)
+        title_box.setContentsMargins(0, 0, 0, 0)
         title_box.setSpacing(2)
-        title = QLabel("数据备份与恢复")
-        title.setObjectName("sectionTitle")
+        title = QLabel("备份与归档")
+        title.setObjectName("toolbarContext")
         title_box.addWidget(title)
         subtitle = QLabel("本地 ZIP 归档、定时备份与可验证恢复")
         subtitle.setObjectName("mutedLabel")
         title_box.addWidget(subtitle)
-        toolbar.addLayout(title_box)
-        toolbar.addStretch(1)
+        self.toolbar_layout.addWidget(self.toolbar_copy, 0, 0)
+        self.toolbar_layout.setColumnStretch(0, 1)
 
         self.refresh_button = QPushButton("刷新记录")
+        self.refresh_button.setIcon(lucide_icon("refresh-cw"))
         self.refresh_button.clicked.connect(self.refresh_all)
-        toolbar.addWidget(self.refresh_button)
+        self.toolbar_layout.addWidget(self.refresh_button, 0, 1)
 
         self.restore_file_button = QPushButton("导入 ZIP 恢复")
+        self.restore_file_button.setObjectName("dangerButton")
         self.restore_file_button.clicked.connect(self._choose_restore_file)
-        toolbar.addWidget(self.restore_file_button)
+        self.toolbar_layout.addWidget(self.restore_file_button, 0, 2)
 
         self.full_backup_button = QPushButton("立即完整备份")
         self.full_backup_button.setObjectName("primaryButton")
+        self.full_backup_button.setIcon(
+            lucide_icon("database-backup", color="#FFFFFF", active_color="#FFFFFF")
+        )
         self.full_backup_button.clicked.connect(self._create_full_backup)
-        toolbar.addWidget(self.full_backup_button)
-        layout.addLayout(toolbar)
+        self.toolbar_layout.addWidget(self.full_backup_button, 0, 3)
+
+        self.more_button = QToolButton()
+        self.more_button.setObjectName("moreButton")
+        self.more_button.setText("更多")
+        self.more_button.setIcon(lucide_icon("clipboard-check"))
+        self.more_button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+        self.more_button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        more_menu = QMenu(self.more_button)
+        more_menu.addAction(lucide_icon("refresh-cw"), "刷新备份记录", self.refresh_all)
+        more_menu.addAction("导入 ZIP 并恢复", self._choose_restore_file)
+        self.more_button.setMenu(more_menu)
+        self.more_button.setVisible(False)
+        self.toolbar_layout.addWidget(self.more_button, 0, 4)
+        layout.addWidget(toolbar_frame)
 
         self.status_line = QLabel()
         self.status_line.setObjectName("summaryText")
@@ -92,8 +124,11 @@ class BackupView(QWidget):
         self.main_splitter = QSplitter(Qt.Orientation.Horizontal)
         self.main_splitter.setObjectName("backupSplitter")
         self.main_splitter.setChildrenCollapsible(False)
-        self.main_splitter.addWidget(self._build_settings_panel())
-        self.main_splitter.addWidget(self._build_history_panel())
+        self.settings_panel = self._build_settings_panel()
+        self.settings_scroll = scrollable_detail(self.settings_panel, name="backupSettingsScroll")
+        self.main_splitter.addWidget(self.settings_scroll)
+        self.history_panel = self._build_history_panel()
+        self.main_splitter.addWidget(self.history_panel)
         self.main_splitter.setStretchFactor(0, 0)
         self.main_splitter.setStretchFactor(1, 1)
         restore_splitter(self.main_splitter, "backup_main", [420, 780])
@@ -120,15 +155,19 @@ class BackupView(QWidget):
         full_button.clicked.connect(self._create_full_backup)
         layout.addWidget(full_button)
 
-        semester_row = QHBoxLayout()
+        self.semester_layout = QGridLayout()
+        self.semester_layout.setContentsMargins(0, 0, 0, 0)
+        self.semester_layout.setHorizontalSpacing(8)
+        self.semester_layout.setVerticalSpacing(8)
         self.semester_box = QComboBox()
         self.semester_box.setMinimumWidth(240)
         self.semester_box.currentIndexChanged.connect(self._update_semester_hint)
-        semester_row.addWidget(self.semester_box, 1)
+        self.semester_layout.addWidget(self.semester_box, 0, 0)
+        self.semester_layout.setColumnStretch(0, 1)
         self.semester_backup_button = QPushButton("归档所选学期")
         self.semester_backup_button.clicked.connect(self._create_semester_archive)
-        semester_row.addWidget(self.semester_backup_button)
-        layout.addLayout(semester_row)
+        self.semester_layout.addWidget(self.semester_backup_button, 0, 1)
+        layout.addLayout(self.semester_layout)
 
         self.semester_hint = QLabel()
         self.semester_hint.setObjectName("backupHint")
@@ -173,13 +212,15 @@ class BackupView(QWidget):
         self.directory_input = QLineEdit()
         self.directory_input.setPlaceholderText("自动备份保存目录")
         directory_row = QWidget()
-        directory_layout = QHBoxLayout(directory_row)
-        directory_layout.setContentsMargins(0, 0, 0, 0)
-        directory_layout.setSpacing(8)
-        directory_layout.addWidget(self.directory_input, 1)
-        browse_button = QPushButton("选择文件夹")
-        browse_button.clicked.connect(self._choose_backup_directory)
-        directory_layout.addWidget(browse_button)
+        self.directory_layout = QGridLayout(directory_row)
+        self.directory_layout.setContentsMargins(0, 0, 0, 0)
+        self.directory_layout.setHorizontalSpacing(8)
+        self.directory_layout.setVerticalSpacing(8)
+        self.directory_layout.addWidget(self.directory_input, 0, 0)
+        self.directory_layout.setColumnStretch(0, 1)
+        self.browse_button = QPushButton("选择文件夹")
+        self.browse_button.clicked.connect(self._choose_backup_directory)
+        self.directory_layout.addWidget(self.browse_button, 0, 1)
         form.addRow("保存位置", directory_row)
         layout.addLayout(form)
 
@@ -219,13 +260,27 @@ class BackupView(QWidget):
         self.history_table.setColumnWidth(2, 230)
         self.history_table.setColumnWidth(3, 260)
         self.history_table.setColumnWidth(4, 88)
-        layout.addWidget(self.history_table, 1)
+        self.history_stack = QStackedWidget()
+        self.history_stack.setObjectName("dataStateStack")
+        self.history_stack.addWidget(self.history_table)
+        self.history_empty_state = EmptyState(
+            icon_name="database-backup",
+            action=self._create_full_backup,
+        )
+        self.history_empty_state.set_content(
+            "还没有备份记录",
+            "创建第一份完整备份后，系统会在这里显示文件状态和恢复入口。",
+            "创建完整备份",
+        )
+        self.history_stack.addWidget(self.history_empty_state)
+        layout.addWidget(self.history_stack, 1)
 
         actions = QHBoxLayout()
         self.open_folder_button = QPushButton("打开所在文件夹")
         self.open_folder_button.clicked.connect(self._open_selected_folder)
         actions.addWidget(self.open_folder_button)
         self.restore_selected_button = QPushButton("恢复所选备份")
+        self.restore_selected_button.setObjectName("dangerButton")
         self.restore_selected_button.clicked.connect(self._restore_selected_backup)
         actions.addWidget(self.restore_selected_button)
         actions.addStretch(1)
@@ -295,6 +350,58 @@ class BackupView(QWidget):
                     item.setData(Qt.ItemDataRole.UserRole, record["backup_path"])
                 self.history_table.setItem(row, column, item)
         self.history_summary.setText(f"{available_count} 个可用备份")
+        self.history_stack.setCurrentWidget(
+            self.history_table if self._records else self.history_empty_state
+        )
+
+    def set_compact_mode(self, compact: bool) -> None:
+        if compact == self._compact_mode:
+            return
+        self._compact_mode = compact
+        self.toolbar_copy.setVisible(not compact)
+        self.refresh_button.setVisible(not compact)
+        self.restore_file_button.setVisible(not compact)
+        self.more_button.setVisible(compact)
+
+        toolbar_widgets = (
+            self.full_backup_button,
+            self.refresh_button,
+            self.restore_file_button,
+            self.more_button,
+        )
+        for widget in toolbar_widgets:
+            self.toolbar_layout.removeWidget(widget)
+        if compact:
+            self.toolbar_layout.addWidget(self.full_backup_button, 0, 0)
+            self.toolbar_layout.addWidget(self.more_button, 0, 1)
+            self.toolbar_layout.setColumnStretch(0, 1)
+        else:
+            self.toolbar_layout.addWidget(self.refresh_button, 0, 1)
+            self.toolbar_layout.addWidget(self.restore_file_button, 0, 2)
+            self.toolbar_layout.addWidget(self.full_backup_button, 0, 3)
+
+        self.semester_layout.removeWidget(self.semester_box)
+        self.semester_layout.removeWidget(self.semester_backup_button)
+        self.directory_layout.removeWidget(self.directory_input)
+        self.directory_layout.removeWidget(self.browse_button)
+        if compact:
+            self.semester_box.setMinimumWidth(0)
+            self.semester_layout.addWidget(self.semester_box, 0, 0)
+            self.semester_layout.addWidget(self.semester_backup_button, 1, 0)
+            self.directory_layout.addWidget(self.directory_input, 0, 0)
+            self.directory_layout.addWidget(self.browse_button, 1, 0)
+        else:
+            self.semester_box.setMinimumWidth(240)
+            self.semester_layout.addWidget(self.semester_box, 0, 0)
+            self.semester_layout.addWidget(self.semester_backup_button, 0, 1)
+            self.directory_layout.addWidget(self.directory_input, 0, 0)
+            self.directory_layout.addWidget(self.browse_button, 0, 1)
+
+        self.main_splitter.setOrientation(
+            Qt.Orientation.Vertical if compact else Qt.Orientation.Horizontal
+        )
+        set_compact_columns(self.history_table, (2, 3), compact)
+        self.main_splitter.setSizes([430, 330] if compact else [420, 780])
 
     def _update_semester_hint(self, *_args) -> None:
         semester_id = self.semester_box.currentData()

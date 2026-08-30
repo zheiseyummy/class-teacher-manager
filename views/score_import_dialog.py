@@ -16,6 +16,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from utils.ui_layout import configure_responsive_dialog
+
 
 class ScoreImportDialog(QDialog):
     def __init__(
@@ -26,9 +28,9 @@ class ScoreImportDialog(QDialog):
     ) -> None:
         super().__init__(parent)
         self.setWindowTitle("导入单次考试成绩")
-        self.setMinimumWidth(460)
         self.exam_data: dict[str, Any] | None = None
         self._build_ui(classes, selected_class_id)
+        configure_responsive_dialog(self, 460)
 
     def _build_ui(self, classes: list[dict[str, Any]], selected_class_id: int | None) -> None:
         layout = QVBoxLayout(self)

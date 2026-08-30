@@ -27,7 +27,7 @@ from PySide6.QtWidgets import (
 )
 
 from controllers.student_controller import StudentController, StudentDataError
-from utils.ui_layout import configure_resizable_table
+from utils.ui_layout import configure_resizable_table, configure_responsive_dialog
 
 
 class GuardianEditorDialog(QDialog):
@@ -36,8 +36,8 @@ class GuardianEditorDialog(QDialog):
         self.guardian = guardian or {}
         self.result_data: dict[str, Any] | None = None
         self.setWindowTitle("编辑联系人" if guardian else "新增联系人")
-        self.setMinimumWidth(460)
         self._build_ui()
+        configure_responsive_dialog(self, 460)
         if guardian:
             self._load_data()
 
@@ -119,9 +119,8 @@ class StudentFormDialog(QDialog):
         self.guardians: list[dict[str, Any]] = []
         self.empty_date = QDate(1900, 1, 1)
         self.setWindowTitle("编辑学生" if student_id else "新增学生")
-        self.resize(840, 760)
-        self.setMinimumSize(720, 640)
         self._build_ui()
+        configure_responsive_dialog(self, 840, 760, minimum_height=480)
         self._load_classes()
         if student_id:
             self._load_student(student_id)
@@ -135,6 +134,7 @@ class StudentFormDialog(QDialog):
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.Shape.NoFrame)
         content = QWidget()
+        content.setObjectName("dialogScrollContent")
         layout = QVBoxLayout(content)
         layout.setContentsMargins(26, 24, 26, 16)
         layout.setSpacing(18)
@@ -204,6 +204,7 @@ class StudentFormDialog(QDialog):
         guardian_actions.addStretch(1)
         edit_guardian = QPushButton("编辑联系人")
         delete_guardian = QPushButton("移除联系人")
+        delete_guardian.setObjectName("dangerButton")
         edit_guardian.clicked.connect(self._edit_guardian)
         delete_guardian.clicked.connect(self._delete_guardian)
         guardian_actions.addWidget(edit_guardian)
