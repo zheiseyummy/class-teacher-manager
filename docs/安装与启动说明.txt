@@ -1,0 +1,23 @@
+班主任综合管理系统 v1.0.1 - 安装与启动说明
+
+一、系统要求
+
+1. Windows 10 1809 或更高版本、Windows 11。
+2. 64 位 Windows 系统。
+3. 软件无需安装 Python，也无需联网。
+
+二、首次使用
+
+1. 将 ClassTeacherManager-v1.0.1-win64.zip 完整解压到本地文件夹。
+2. 打开解压后的 ClassTeacherManager 文件夹。
+3. 双击 ClassTeacherManager.exe。
+
+请勿只复制 ClassTeacherManager.exe。程序运行还需要同目录中的 _internal 和 resources 等文件。
+
+三、启动失败
+
+若程序无法启动，请不要删除数据文件。把程序目录中新生成的“启动诊断.txt”提供给维护人员即可定位问题。
+
+四、数据说明
+
+业务数据默认保存在当前 Windows 用户的本地应用数据目录。升级程序时请使用软件内的“数据备份与恢复”先创建 ZIP 备份。
