@@ -1,5 +1,7 @@
 # UI Delivery Report
 
+Release version: `v1.0.0`
+
 ## Delivery Summary
 
 The existing PySide6 application has been upgraded from a wide-screen prototype into a restrained campus-management SaaS-style desktop workspace. Existing controllers, SQLite models, imports, exports and safety confirmations remain intact; no backend protocol or student data structure was changed.
@@ -74,6 +76,8 @@ The existing PySide6 application has been upgraded from a wide-screen prototype 
 | `git diff --check` | Passed; only expected Windows LF/CRLF notices |
 | PyInstaller production build | Passed |
 | Built executable | `dist-python/ClassTeacherManager/ClassTeacherManager.exe` |
+| Versioned portable package | `dist-python/ClassTeacherManager-v1.0.0-win64.zip` |
+| SHA-256 checksum | `dist-python/ClassTeacherManager-v1.0.0-win64.zip.sha256` |
 
 Dedicated Ruff/Mypy/Pytest configurations do not exist in this repository and those packages are not installed, so no separate lint or static type-check command could be run. The repository's own executable smoke scripts were run directly, and syntax/import validation was completed with `compileall`.
 

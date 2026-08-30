@@ -3,9 +3,16 @@ from __future__ import annotations
 import sys
 
 from PySide6.QtCore import QTimer
+from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication
 
-from config import APP_NAME, APP_VERSION, SCORE_IMPORT_TEMPLATE, STUDENT_IMPORT_TEMPLATE
+from config import (
+    APP_NAME,
+    APP_VERSION,
+    RESOURCE_DIR,
+    SCORE_IMPORT_TEMPLATE,
+    STUDENT_IMPORT_TEMPLATE,
+)
 from database.init_db import initialize_database
 from utils.excel_service import ensure_student_import_template
 from utils.score_excel_import import ensure_score_import_template
@@ -22,6 +29,7 @@ def main() -> int:
     app.setApplicationName(APP_NAME)
     app.setApplicationVersion(APP_VERSION)
     app.setOrganizationName("LocalClassManager")
+    app.setWindowIcon(QIcon(str(RESOURCE_DIR / "app.ico")))
 
     window = MainWindow()
     window.show()
